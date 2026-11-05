@@ -1,0 +1,30 @@
+[project]
+name = "multmashina"
+version = "0.1.0"
+description = "Мультмашина: универсальный генератор мультиков и рилсов из сценария — герои с лицами и эмоциями, настраиваемые стили, озвучка нейросетью, рендер в MP4"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "pyyaml>=6",
+    "numpy>=1.26",
+    "playwright>=1.45",
+]
+
+# Озвучка ставится по выбору: общая часть (времена слов) + один голосовой бэкенд.
+# Пример: uv run --extra voice --extra qwen python scripts/mm.py озвучить examples/jobturbo
+[project.optional-dependencies]
+voice = ["faster-whisper>=1.0", "soundfile"]           # выравнивание слов — нужно любому бэкенду
+qwen = ["mlx-audio>=0.6", "soundfile"]                 # Qwen3-TTS (клон голоса / голос по описанию), только Mac на Apple Silicon
+chatterbox = ["chatterbox-tts", "setuptools<81", "soundfile"]   # Chatterbox multilingual (PyTorch)
+edge = ["edge-tts", "soundfile"]                       # Edge TTS (нужен интернет)
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]
+markers = ["browser: тесты, которым нужен Chromium (playwright install chromium)"]
+
+# Qwen (mlx-audio) и Chatterbox требуют разные версии transformers — вместе их ставить нельзя, выбирайте один голосовой бэкенд.
+[tool.uv]
+conflicts = [[{ extra = "qwen" }, { extra = "chatterbox" }]]

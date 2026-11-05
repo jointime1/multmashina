@@ -1,0 +1,12 @@
+# собранное и снятое
+build/
+out/
+# сырая озвучка (воспроизводится командой «озвучить»); готовые mp3 и timings.json в примерах — коммитятся
+examples/*/audio/raw/
+*.tmp.mp4
+# окружения и кеши
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
