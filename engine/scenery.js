@@ -115,8 +115,8 @@ function note(g, t0, str) {
   return t;
 }
 
-// покачивание на месте: y0 ± amp с периодом period на отрезке t0..t0+dur
-const bob = (e, y0, amp, period, t0, dur) => dur <= .05 ? null : prog(q => put(e, { y: y0 + amp * Math.sin(q * dur / period * Math.PI * 2) }), t0, dur, lin);
+// покачивание на месте: y0 ± amp с периодом period на отрезке t0..t0+dur (через tick: бит не растягивается, даже если dur больше бита)
+const bob = (e, y0, amp, period, t0, dur) => dur <= .05 ? null : tick(t => put(e, { y: y0 + amp * Math.sin(Math.min(Math.max(t - t0, 0), dur) / period * Math.PI * 2) }));
 
 // красная линия поверх (зачёркивание, крест)
 function strike(g, x1, y1, x2, y2, t0, { w = 28, colour = RED, dur = .25 } = {}) {
@@ -126,20 +126,20 @@ function strike(g, x1, y1, x2, y2, t0, { w = 28, colour = RED, dur = .25 } = {})
   return p;
 }
 
-// искры сварки: частицы летят вверх-в стороны и падают, всё от времени бита
+// искры сварки: частицы летят вверх-в стороны и падают, видны на отрезке t0..t1 (через tick: t1 не растягивает бит)
 function sparks(g, x, y, t0, t1, { n = 34, seed = 5 } = {}) {
   const R = seeded(seed), grp = G(g, {}), ps = [];
   for (let i = 0; i < n; i++) ps.push({ a: -Math.PI * (.12 + R() * .76), v: 220 + R() * 420, ph: R(), life: .45 + R() * .45, el: mk('circle', { r: 3 + R() * 4, fill: R() < .5 ? '#ffd23f' : '#ff8a3d' }, grp) });
   const core = mk('circle', { cx: x, cy: y, r: 16, fill: '#fff7c2' }, grp);
-  prog(q => {
-    const t = t0 + q * (t1 - t0);
+  tick(t => {
+    const on = t >= t0 && t <= t1;
     ps.forEach(p => {
       const age = (((t / p.life) + p.ph) % 1) * p.life;
       p.el.setAttribute('cx', x + Math.cos(p.a) * p.v * age); p.el.setAttribute('cy', y + Math.sin(p.a) * p.v * age + 760 * age * age);
-      p.el.setAttribute('opacity', 1 - age / p.life);
+      p.el.setAttribute('opacity', on ? 1 - age / p.life : 0);
     });
-    core.setAttribute('r', 13 + 6 * Math.abs(Math.sin(t * 41)));
-  }, t0, t1 - t0, lin);
+    core.setAttribute('r', on ? 13 + 6 * Math.abs(Math.sin(t * 41)) : 0);
+  });
   return grp;
 }
 

@@ -7,6 +7,7 @@ const CAP = Object.assign({ y: 1228, size: 72, color: MARK, stroke: '#0b0d14', w
 function caps(p, id, pre = 0) {
   const ws = (window.WORDS || {})[id], dur = (window.TIMINGS[id] || {}).dur;
   if (!ws || !ws.length) return;
+  const конец = CUR.end;                                              // затухание последнего субтитра не должно удлинять бит
   // слова собираются в короткие группы: до CAP.words слов и CAP.chars знаков, новая группа после паузы длиннее CAP.gap
   const chunks = [];
   let cur = null;
@@ -19,10 +20,11 @@ function caps(p, id, pre = 0) {
   if (cur) chunks.push(cur);
   chunks.forEach((c, i) => {
     const nx = chunks[i + 1], t0 = pre + c.t, t1 = pre + (nx && nx.t - c.end < .3 ? nx.t : c.end + .12);
-    const e = G(p, { x: CX, y: CAP.y, s: .88, o: 0 }), size = Math.min(CAP.size, CAP.size * CAP.max_width / inkW(c.text, CAP.size));
+    const e = G(CUR.fixed || p, { x: CX, y: CAP.y, s: .88, o: 0 }), size = Math.min(CAP.size, CAP.size * CAP.max_width / inkW(c.text, CAP.size));
     const t = T(e, c.text, { x: 0, y: 0, size, fill: CAP.color, weight: 600, anchor: 'middle' });
     t.setAttribute('stroke', CAP.stroke); t.setAttribute('stroke-width', size / 6); t.setAttribute('paint-order', 'stroke'); t.setAttribute('stroke-linejoin', 'round');
     tw(e, { s: 1, o: 1 }, t0, .07, out);
     hide(e, t1, .05, lin);
   });
+  CUR.end = конец;
 }

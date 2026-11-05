@@ -5,7 +5,8 @@
    Поэтому перемотка, пауза и покадровый рендер дают один и тот же результат, а видео можно снимать в любом порядке.
 
    Эпизод состоит из битов: бит = одна реплика закадрового голоса + картинка к ней. Биты идут друг за другом, длина бита —
-   максимум из (пауза до голоса + длина реплики) и конца последней анимации, плюс пауза после бита.
+   максимум из (пауза до голоса + длина реплики) и конца последней анимации, плюс пауза после бита (эффекты → пауза_после_бита, по умолчанию 0,3 с).
+   Пауза между репликами на видео = эта пауза + хвост голоса: длинные паузы почти всегда от анимации, которая кончается позже слов.
 
    Файл подключается обычным <script>; имена ниже — глобальные, чтобы код сцен был коротким. */
 'use strict';
@@ -14,8 +15,10 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const STYLE = window.STYLE || {};                                   // style.js, собирает scripts/build.py из TOML
 const STAGE = Object.assign({ w: 900, h: 1600 }, STYLE.stage);
 const W = STAGE.w, H = STAGE.h, CX = W / 2;
-const FX = Object.assign({ lead: .22, hold: .6, grain: true, vignette: .5 }, STYLE.effects);
-const LEAD = FX.lead;                                               // картинка опережает слово на LEAD секунд: на самом слове она уже «приехала»
+const FX = Object.assign({ lead: .22, hold: .3, grain: true, vignette: .5 }, STYLE.effects);
+const LEAD = FX.lead;
+// движение: входы элементов, переходы между сценами, камера, реакция героев (стиль → анимации); по умолчанию всё выключено
+const MO = Object.assign({ enters: [], trans: [], cam: [], camAmp: .04, transDur: .22, punch: 0 }, STYLE.motion);                                               // картинка опережает слово на LEAD секунд: на самом слове она уже «приехала»
 
 // ---------- плавности ----------
 const lin = q => q;
@@ -141,18 +144,18 @@ function tick(f) { CUR.ticks.push(f); }
 function sfx(_beat, t, name, vol = 1) { if (CUR) CUR.sfx.push({ t, name, vol }); }
 
 // панель текущего бита (группа SVG, которую показывают только пока идёт бит)
-const panel = () => CUR.panel;
+const panel = () => CUR.world;                                      // слой сцены: его двигает камера; субтитры лежат в CUR.fixed и стоят на месте
 
 // ---------- сборка эпизода ----------
 function buildBeats(defs) {
   const svg = document.getElementById('mm-svg');
   let start = 0;
-  defs.forEach(([id, title, run, extra = {}]) => {
+  defs.forEach(([id, title, run, extra = {}], idx) => {
     const tm = (window.TIMINGS || {})[id];
     if (!tm) throw new Error(`Для бита «${id}» нет времён озвучки (timings): запустите озвучку или сборку`);
     const pre = extra.pre || 0;
-    const p = mk('g', { display: 'none' }, svg);
-    CUR = { id, title, panel: p, els: new Set(), progs: [], ticks: [], sfx: [], end: 0, pre, dur: tm.dur, start };
+    const p = mk('g', { display: 'none' }, svg), world = mk('g', {}, p), fixed = mk('g', {}, p);
+    CUR = { id, title, panel: p, world, fixed, idx, els: new Set(), progs: [], ticks: [], sfx: [], end: 0, pre, dur: tm.dur, start };
     BEAT_ID = id;
     // m('метка', сдвиг): время начала слова после [[метка]] на часах бита (с опережением LEAD)
     const m = (name, off = 0) => {
@@ -160,6 +163,11 @@ function buildBeats(defs) {
       return Math.max(0, tm.marks[name] + pre + off - LEAD);
     };
     run(m, tm.dur);
+    // переход в этот бит и движение камеры: из стиля по кругу или явно в третьем элементе бита ({ trans: 'flash', cam: 'in' })
+    CUR.trans = extra.trans || (idx > 0 && MO.trans.length ? MO.trans[(idx - 1) % MO.trans.length] : 'cut');
+    CUR.cam = extra.cam || (MO.cam.length ? MO.cam[idx % MO.cam.length] : 'none');
+    if (CUR.trans === 'flash' || CUR.trans === 'dip') CUR.ov = rect(p, -20, -20, W + 40, H + 40, { fill: CUR.trans === 'flash' ? '#fff' : '#000', opacity: 0 });
+    if (CUR.trans === 'whip' || CUR.trans === 'push' || CUR.trans === 'zoom') CUR.sfx.push({ t: 0, name: 'whoosh', vol: .3 });
     CUR.len = Math.max(pre + tm.dur, CUR.end) + FX.hold;
     start += CUR.len;
     BEAT_LIST.push(CUR);
@@ -168,7 +176,7 @@ function buildBeats(defs) {
   return start;
 }
 
-function evalBeat(b, lt) {
+function evalBeat(b, lt, leave) {
   RENDERING = true;
   for (const e of b.els) {
     e._ov = null;
@@ -180,14 +188,47 @@ function evalBeat(b, lt) {
   for (const p of b.progs) p.f(p.ease(clamp01((lt - p.t0) / p.dur)));
   for (const f of b.ticks) f(lt);
   RENDERING = false;
+  motion(b, lt, leave);
 }
 
-let shown = null;
+// камера и переход бита: преобразование слоя сцены (субтитры не двигаются). leave — как уходит предыдущая сцена при переходе {x, y}
+function motion(b, lt, leave) {
+  const w = b.world;
+  if (window.__mmNoFx) { w.removeAttribute('transform'); w.removeAttribute('opacity'); if (b.ov) b.ov.setAttribute('opacity', 0); return; }   // проверка раскладки идёт без камеры
+  const A = MO.camAmp, q = soft(clamp01(lt / b.len)), u = clamp01(lt / MO.transDur), e = out(u);
+  let k = 1, dx = 0, ex = leave ? leave.x : 0, ey = leave ? leave.y : 0, op = 1;
+  if (b.cam === 'in') k = 1 + A * q; else if (b.cam === 'out') k = 1 + A * (1 - q);
+  else if (b.cam === 'left' || b.cam === 'right') { k = 1 + A; dx = (b.cam === 'left' ? -1 : 1) * A * W * .45 * (2 * q - 1); }
+  if (!leave && u < 1) {
+    if (b.trans === 'whip') ex = W * .55 * (1 - e);
+    else if (b.trans === 'push') ey = H * .3 * (1 - e);
+    else if (b.trans === 'zoom') { k *= 1 + .2 * (1 - e); op = .35 + .65 * e; }
+  }
+  if (b.ov) b.ov.setAttribute('opacity', u < 1 ? (b.trans === 'flash' ? .9 : 1) * Math.pow(1 - u, 1.6) : 0);
+  const tr = [];
+  if (ex || ey) tr.push(`translate(${num(ex)} ${num(ey)})`);
+  if (k !== 1 || dx) tr.push(`translate(${num(CX + dx)} ${num(H / 2)}) scale(${num(k)}) translate(${-CX} ${-H / 2})`);
+  if (tr.length) w.setAttribute('transform', tr.join(' ')); else w.removeAttribute('transform');
+  if (op < 1) w.setAttribute('opacity', num(op)); else w.removeAttribute('opacity');
+}
+let shown = [];
 function renderAt(t) {
-  let b = BEAT_LIST.find(x => t < x.start + x.len) || BEAT_LIST[BEAT_LIST.length - 1];
-  if (shown !== b) { if (shown) shown.panel.setAttribute('display', 'none'); b.panel.setAttribute('display', 'inline'); shown = b; }
+  let bi = BEAT_LIST.findIndex(x => t < x.start + x.len);
+  if (bi < 0) bi = BEAT_LIST.length - 1;
+  const b = BEAT_LIST[bi], lt = Math.min(t - b.start, b.len), u = clamp01(lt / MO.transDur);
+  // во время перехода под новой сценой видна уходящая (рывок и сдвиг двигают обе, зум — перекрёстное затухание)
+  const prev = bi > 0 && u < 1 && !window.__mmNoFx && (b.trans === 'whip' || b.trans === 'push' || b.trans === 'zoom') ? BEAT_LIST[bi - 1] : null;
+  const want = prev ? [prev, b] : [b];
+  shown.forEach(x => { if (!want.includes(x)) x.panel.setAttribute('display', 'none'); });
+  want.forEach(x => { if (!shown.includes(x)) x.panel.setAttribute('display', 'inline'); });
+  shown = want;
+  if (prev) {
+    const e = out(u);
+    BEAT_ID = prev.id;
+    evalBeat(prev, prev.len, { x: b.trans === 'whip' ? -W * .35 * e : 0, y: b.trans === 'push' ? -H * .2 * e : 0 });
+  }
   BEAT_ID = b.id;
-  evalBeat(b, Math.min(t - b.start, b.len));
+  evalBeat(b, lt);
 }
 
 // описание эпизода для рендера и озвучки: длительность, биты (где начинается голос), звуковые эффекты

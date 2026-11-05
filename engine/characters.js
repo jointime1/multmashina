@@ -47,7 +47,8 @@ function emoAt(keys, tau) {
 let faceN = 0;
 /* face(g, x, y, s, keys, t0, t1, opts): герой по пояс; x, y — центр головы, s — масштаб.
    keys — [[t, 'emo', {добавки}], …] во времени бита; t0..t1 — когда кадр живёт (рисуется на этом отрезке);
-   opts: skin, hair (цвет), seed (сдвиг моргания), glasses (0 — без очков), in (когда выпрыгивает), tilt,
+   opts: skin, hair (цвет), seed (сдвиг моргания), glasses (0 — без очков), in (когда выпрыгивает) + enter (как: drop, left, right, rise, zoom, spin), tilt,
+         punch (сила «вздрагивания» при смене эмоции; по умолчанию из стиля, анимации → реакция),
          hoodCol, suit (цвет пиджака) + tie + shirt, bald, longHair, lips, noNose, box (коробка с вещами в руках);
          облик: armor (цвет доспеха: наплечники с шипами, нагрудник, плащ cloak), arms (голые руки), tattoo (цвет татуировок на руках и шее),
          build (ширина торса и рук, 1 — обычный, 1.5 — качок), mustache (усы), buzz (бритая голова со щетиной), eyeCol (цвет радужки),
@@ -57,8 +58,9 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
   const shade = (hex, k) => '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
   const id = ++faceN, skin = o.skin || SKIN, hairC = o.hair || HAIR_COL, seed = o.seed || 0, glasses = o.glasses === undefined ? 1 : o.glasses;
   keys = keys.map(([t, name, over]) => ({ t, p: { ...EMO0, ...(EMO[name] || {}), ...(over || {}) } }));
-  const R = G(g, o.in === undefined ? { x, y, s } : { x, y, s: s * .7, o: 0 });
-  if (o.in !== undefined) { tw(R, { s, o: 1 }, o.in, .3, back); sfx(BEAT_ID, o.in, 'thud', .5); }
+  const own = o.enter && o.enter !== 'pop';                         // свой вход (drop, left, right, rise, zoom, spin) вместо прыжка по умолчанию
+  const R = G(g, o.in === undefined || own ? { x, y, s } : { x, y, s: s * .7, o: 0 });
+  if (o.in !== undefined) { if (own) enter(R, o.enter, o.in, { x, y, s }); else tw(R, { s, o: 1 }, o.in, .3, back); sfx(BEAT_ID, o.in, 'thud', .5); }
 
   // тело: Петя в толстовке, Петрович в комбинезоне поверх майки (переключаются по rank); массовка — в пиджаке (suit)
   const B = mk('g', {}, R), torso = 'M -196 340 C -196 232 -124 176 -46 166 L 46 166 C 124 176 196 232 196 340 Z';
@@ -200,11 +202,16 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
   mk('rect', { x: -98, y: -38, width: 196, height: 62, rx: 12, fill: '#0f2a1d', stroke: INK, 'stroke-width': 4 }, visor);
   mk('path', { d: 'M -80 -26 L -20 -26 L -50 14 Z', fill: 'rgba(255,255,255,.14)' }, visor);
 
+  // реакция: когда эмоция меняется, герой вздрагивает (голова подпрыгивает, тело на миг вытягивается) — оживляет разговорные сцены
+  const punch = o.punch !== undefined ? o.punch : MO.punch, moved = keys.map((k, i) => i > 0 && JSON.stringify(k.p) !== JSON.stringify(keys[i - 1].p));
   const render = tau => {
+    let bump = 0;
+    if (punch) for (let k = 1; k < keys.length; k++) if (moved[k]) { const a = (tau - keys[k].t + .1) / .34; if (a >= 0 && a < 1) bump = Math.max(bump, Math.sin(a * Math.PI)); }
+    const pk = punch * bump;
     const p = emoAt(keys, tau), tt = tau + seed, ph = tt % 3.3, blink = ph < .13 ? Math.sin(ph / .13 * Math.PI) : 0;
-    B.setAttribute('transform', `translate(0 ${Math.sin(tt * 2.2) * 3}) scale(1 ${1 + Math.sin(tt * 2.2) * .012})`);
+    B.setAttribute('transform', `translate(0 ${Math.sin(tt * 2.2) * 3 - pk * 120}) scale(${1 + pk * .6} ${1 + Math.sin(tt * 2.2) * .012 + pk * 1.2})`);
     hood.setAttribute('opacity', suit || armor ? 0 : 1 - p.rank); ov.setAttribute('opacity', suit || armor ? 0 : p.rank);
-    H.setAttribute('transform', `translate(${p.shk ? Math.sin(tt * 46) * p.shk : 0} ${Math.sin(tt * 2.2 + 1) * 2}) rotate(${p.r + (o.tilt || 0) + Math.sin(tt * 1.3) * 1.2})`);
+    H.setAttribute('transform', `translate(${p.shk ? Math.sin(tt * 46) * p.shk : 0} ${Math.sin(tt * 2.2 + 1) * 2 - pk * 220}) rotate(${p.r + (o.tilt || 0) + Math.sin(tt * 1.3) * 1.2})`);
     hair.setAttribute('opacity', (o.bald ? 0 : 1) * (1 - p.rank) * (1 - p.helm));
     hair.setAttribute('transform', `rotate(${Math.sin(tt * 2.6) * 1.4 * (1 + p.hair * 3)}) translate(0 ${-p.hair * 20}) scale(${1 + p.hair * .05} ${1 + p.hair * .15})`);
     cap.setAttribute('opacity', p.rank > .02 && p.helm < .5 ? 1 : 0);

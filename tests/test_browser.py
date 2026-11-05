@@ -112,3 +112,38 @@ start(BEATS);
     finally:
         srv.shutdown()
     assert not ошибки, ошибки
+
+
+@pytest.mark.browser
+def test_пауза_между_сценами_это_только_удержание(мини):
+    """Субтитры, искры и покачивание, чей конец далеко за битом, не растягивают его: длина бита = голос + пауза_после_бита."""
+    (мини / 'scenes.js').write_text("""'use strict';
+const BEATS = [['один', 'Тест', (m, D) => {
+  const p = panel(0), s = shot(p, 0, undefined, { bg: DARK });
+  const w = word(s, 'мир', CX, 600, m('w'), { size: 160, fill: LIGHT });
+  sparks(s, 450, 800, 0, 99); bob(w, 600, 8, 1, 0, 99);
+  hero(s, 'петя', CX, 1000, 1, [[0, 'neutral'], [m('w'), 'grin']], 0, D);
+  finish(p); caps(p, 'один');
+}]];
+start(BEATS);
+""", encoding='utf-8')
+    вых = build.собрать(мини, выход=config.ROOT / 'build' / 'тест-пауза')
+    srv, порт = serve.запустить(вых)
+    ошибки = []
+    try:
+        with playwright.sync_playwright() as p:
+            try:
+                br = p.chromium.launch()
+            except Exception as e:
+                pytest.skip(f'нет Chromium: {e}')
+            page = br.new_page(viewport={'width': 450, 'height': 800})
+            page.on('pageerror', lambda e: ошибки.append(str(e)))
+            page.goto(f'http://127.0.0.1:{порт}/index.html?clean')
+            page.wait_for_function('window.MM && window.MM.ready', timeout=60000)
+            man, hold = page.evaluate('[MM.manifest(), FX.hold]')
+            assert hold <= .35, f'пауза_после_бита по умолчанию слишком длинная: {hold} с'
+            assert abs(man['duration'] - (1.4 + hold)) < .01, f'бит растянулся до {man["duration"]} с вместо {1.4 + hold}'
+            br.close()
+    finally:
+        srv.shutdown()
+    assert not ошибки, ошибки

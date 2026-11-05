@@ -134,6 +134,21 @@ def test_проверить_замечает_слово_вне_зоны(мини
     assert check.проверить(мини, строго=True) == 1                   # со строгим режимом замечание валит проверку
 
 
+@pytest.mark.browser
+def test_проверить_замечает_долгую_паузу_между_сценами(мини, в_пустой, capsys):
+    from mmlib import check
+    # анимация кончается через 5 секунд при голосе 1,4 с: после реплики на видео повисла бы тишина в несколько секунд
+    _сцена(мини, "prog(() => {}, 0, 5);")
+    try:
+        check.проверить(мини)
+    except Exception as e:
+        if 'Executable' in str(e):
+            pytest.skip(f'нет Chromium: {e}')
+        raise
+    вывод = capsys.readouterr().out
+    assert 'тишины' in вывод and 'бит «один»' in вывод, вывод
+
+
 # ---------- кадры ----------
 
 @pytest.mark.browser
