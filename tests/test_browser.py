@@ -36,3 +36,33 @@ def test_страница_рисует_кадры(мини):
     finally:
         srv.shutdown()
     assert not ошибки, ошибки
+
+
+@pytest.mark.browser
+def test_нерисованная_линия_не_оставляет_точку(мини, tmp_path):
+    """У линии нулевой длины круглые кончики рисуют точку: до начала рисования (и вообще пока d=0) линия должна быть скрыта."""
+    (мини / 'scenes.js').write_text("""'use strict';
+const BEATS = [['один', 'Тест', (m, D) => {
+  const p = panel(0), s = shot(p, 0, undefined, { bg: DARK });
+  strike(s, 100, 300, 700, 300, 1.0);
+  finish(p); caps(p, 'один');
+}]];
+start(BEATS);
+""", encoding='utf-8')
+    вых = build.собрать(мини, выход=config.ROOT / 'build' / 'тест-линия')
+    srv, порт = serve.запустить(вых)
+    try:
+        with playwright.sync_playwright() as p:
+            try:
+                br = p.chromium.launch()
+            except Exception as e:
+                pytest.skip(f'нет Chromium: {e}')
+            page = br.new_page(viewport={'width': 450, 'height': 800})
+            page.goto(f'http://127.0.0.1:{порт}/index.html?clean')
+            page.wait_for_function('window.MM && window.MM.ready', timeout=60000)
+            видимость = lambda t: (page.evaluate('t => MM.seek(t)', t), page.evaluate("[...document.querySelectorAll('#mm-svg path[stroke-dasharray]')].map(e => e.getAttribute('visibility'))"))[1]
+            assert видимость(.2) == ['hidden'], 'линия до начала рисования должна быть скрыта'
+            assert видимость(1.3) == [None], 'нарисованная линия должна быть видна'
+            br.close()
+    finally:
+        srv.shutdown()

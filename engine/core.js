@@ -54,7 +54,11 @@ function paint(e, v) {
   if (v.s !== 1) tr.push(`scale(${num(v.s)})`);
   if (tr.length) e.setAttribute('transform', tr.join(' ')); else e.removeAttribute('transform');
   if (v.o >= 1) e.removeAttribute('opacity'); else e.setAttribute('opacity', num(Math.max(0, v.o)));
-  if (e._len !== undefined) e.setAttribute('stroke-dashoffset', num(e._len * (1 - v.d)));
+  if (e._len !== undefined) {
+    e.setAttribute('stroke-dashoffset', num(e._len * (1 - v.d)));
+    // нерисованная линия скрыта совсем: с круглыми кончиками штрих нулевой длины всё равно оставляет точку
+    if (v.d <= 0.001) e.setAttribute('visibility', 'hidden'); else e.removeAttribute('visibility');
+  }
 }
 
 function withState(e, st) {

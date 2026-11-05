@@ -45,16 +45,16 @@ def проверить_озвучку(биты, тайминги):
 def собрать(папка, выход=None, стиль_имя=None):
     папка = Path(папка).resolve()
     ep, биты = config.эпизод(папка)
-    стиль = config.дополнить_стиль(config.стиль(стиль_имя or ep.get('стиль', 'dark-yard')), ep)
+    стиль = config.дополнить_стиль(config.стиль(стиль_имя or ep.get('стиль', 'dark-yard'), папка), ep)
     аудио = папка / 'audio'
     if not (аудио / 'timings.json').exists():
         raise config.ОшибкаКонфига(f'Нет {аудио}/timings.json: сначала озвучьте эпизод (python scripts/mm.py озвучить {папка.name})')
     тайминги = json.loads((аудио / 'timings.json').read_text(encoding='utf-8'))
     проверить_озвучку(биты, тайминги)
 
-    вых = Path(выход) if выход else config.ROOT / 'build' / (папка.name + (f'--{Path(стиль_имя).stem}' if стиль_имя else ''))
+    вых = Path(выход) if выход else Path.cwd() / 'build' / (папка.name + (f'--{Path(стиль_имя).stem}' if стиль_имя else ''))
     if вых.exists():
-        if config.ROOT / 'build' not in вых.parents:
+        if not any(x.name == 'build' for x in вых.parents):
             raise config.ОшибкаКонфига(f'Не буду стирать {вых}: очищаются только папки внутри build/')
         shutil.rmtree(вых)
     (вых / 'engine').mkdir(parents=True)

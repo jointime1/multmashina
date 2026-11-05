@@ -61,7 +61,7 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
   mk('ellipse', { cx: 0, cy: 150, rx: 118, ry: 56, fill: '#334155', ...LINE }, hood);
   mk('path', { d: torso, fill: o.hoodCol || '#475569', ...LINE }, hood);
   mk('path', { d: 'M -22 172 L -30 252 M 22 172 L 30 252', stroke: '#e2e8f0', 'stroke-width': 6, 'stroke-linecap': 'round', fill: 'none' }, hood);
-  T(hood, '</>', { x: 0, y: 312, size: 58, fill: ACCENT, font: MONO, weight: 700, anchor: 'middle' });
+  T(hood, '</>', { x: 0, y: 312, size: 58, fill: ACCENT, font: MONO, weight: 700, anchor: 'middle' }).setAttribute('data-decor', '1');   // украшение: проверка безопасной зоны его пропускает
   const ov = mk('g', { opacity: 0 }, B);
   mk('path', { d: torso, fill: '#e2e8f0', ...LINE }, ov);
   mk('path', { d: 'M -150 340 L -150 252 L -100 210 L 100 210 L 150 252 L 150 340 Z', fill: '#2563eb', ...LINE }, ov);
@@ -88,7 +88,7 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
     mk('circle', { cx: 28, cy: 216, r: 4, fill: INK }, bx);
     mk('rect', { x: -156, y: 262, width: 312, height: 150, rx: 8, fill: '#c19a6b', ...LINE }, bx);
     mk('path', { d: 'M -156 262 L -184 236 L -64 236 L -44 262 Z M 156 262 L 184 236 L 64 236 L 44 262 Z', fill: '#d6b48a', ...LINE }, bx);
-    T(bx, 'ПЕТЯ', { x: 0, y: 352, size: 64, fill: '#3b2a20', font: SANS, weight: 600, anchor: 'middle' });
+    T(bx, 'ПЕТЯ', { x: 0, y: 352, size: 64, fill: '#3b2a20', font: SANS, weight: 600, anchor: 'middle' }).setAttribute('data-decor', '1');   // надпись на коробке — реквизит
   }
 
   // голова: волосы сзади, уши, лицо, потом щетина / нос / глаза / рот / волосы / кепка / очки

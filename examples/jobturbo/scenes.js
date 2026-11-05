@@ -82,12 +82,12 @@ const BEATS = [
     const a = shot(p, 0, tT, { bg: DARK }); room(a, 'комната');
     notif(a, CX, 400, 780, tO, { icon: 'briefcase', top: 'НОВОЕ ПИСЬМО', title: 'ОФФЕР: Senior Developer', sub: '«Добро пожаловать в команду»' });
     hero(a, 'петя', CX, 830, 1.15, [[0, 'grin'], [tT - .3, 'dead']], 0, tT, { seed: .3 });
-    stamp(a, 'ОФФЕР', 690, 640, tO + .3, { size: 90, colour: GREEN, r: -8 });
+    stamp(a, 'ОФФЕР', 650, 640, tO + .3, { size: 90, colour: GREEN, r: -8 });
     const b = shot(p, tT, undefined, { bg: DARK, whip: true }); room(b, 'комната');
     hero(b, 'петя', CX, 800, 1.3, [[tT, 'thinking']], tT, D, { seed: 1.4 });
     cloud(b, 650, 300, 380, 230, tT + .1);
     helmetPic(b, 650, 300, 150, tT + .4);
-    word(b, '?', 800, 560, tT + .5, { size: 200, fill: MARK, stroke: DARK });
+    word(b, '?', 760, 560, tT + .5, { size: 200, fill: MARK, stroke: DARK });
     finish(p); caps(p, 'offer');
   }],
 

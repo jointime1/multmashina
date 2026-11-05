@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Мультмашина: универсальный генератор мультиков и рилсов. Команды:
 
+  python scripts/mm.py окружение                    что есть на машине: ffmpeg, Chromium, голосовые бэкенды (с чего начинать агенту)
+  python scripts/mm.py новый examples/<имя>         новый эпизод из шаблона (3 бита, герой, комната, субтитры)
+  python scripts/mm.py проверить examples/<эпизод>  ошибки в сценах, слова вне безопасной зоны, длины и темп речи
+  python scripts/mm.py кадры examples/<эпизод>      контактные листы кадров: увидеть свою работу глазами
   python scripts/mm.py ассеты                        сгенерировать звуковые эффекты (assets/sfx) и зерно (assets/grain.png)
   python scripts/mm.py озвучить examples/<эпизод>   озвучить биты выбранным голосом и выровнять слова
   python scripts/mm.py собрать examples/<эпизод>    собрать автономную страницу в build/<эпизод>
@@ -16,10 +20,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mmlib import build, config
 
 
-def main():
+def парсер():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='команда', required=True)
     sub.add_parser('ассеты')
+    sub.add_parser('окружение')
+    n = sub.add_parser('новый'); n.add_argument('эпизод', help='куда создать, например examples/мой-ролик')
+    n.add_argument('--стиль', default='dark-yard'); n.add_argument('--название')
+    pr = sub.add_parser('проверить'); pr.add_argument('эпизод'); pr.add_argument('--стиль'); pr.add_argument('--строго', action='store_true', help='замечания тоже считать ошибкой')
+    kd = sub.add_parser('кадры'); kd.add_argument('эпизод'); kd.add_argument('--стиль'); kd.add_argument('--куда', help='папка для листов (по умолчанию review/<эпизод>)')
+    kd.add_argument('--моменты', help='свои моменты: hook:0.3,offer:mid,outro:end')
     for имя in ('озвучить', 'собрать', 'смотреть', 'снять'):
         s = sub.add_parser(имя)
         s.add_argument('эпизод', help='папка эпизода, например examples/jobturbo')
@@ -35,9 +45,25 @@ def main():
             s.add_argument('--fps', type=int, default=30)
             s.add_argument('--потоков', type=int, default=4, help='сколько браузеров снимают кадры одновременно')
             s.add_argument('--кодек', default='libx264', choices=['libx264', 'videotoolbox'])
-    a = p.parse_args()
+    return p
+
+
+def main():
+    a = парсер().parse_args()
     try:
-        if a.команда == 'ассеты':
+        if a.команда == 'окружение':
+            from mmlib import env
+            sys.exit(env.проверить())
+        elif a.команда == 'новый':
+            from mmlib import new
+            new.создать(a.эпизод, a.стиль, a.название)
+        elif a.команда == 'проверить':
+            from mmlib import check
+            sys.exit(check.проверить(a.эпизод, a.стиль, a.строго))
+        elif a.команда == 'кадры':
+            from mmlib import frames
+            frames.снять(a.эпизод, a.куда, a.моменты, a.стиль)
+        elif a.команда == 'ассеты':
             from mmlib import assets
             assets.всё(config.ROOT)
         elif a.команда == 'озвучить':
@@ -61,7 +87,7 @@ def main():
         elif a.команда == 'снять':
             from mmlib import render
             папка = build.собрать(a.эпизод, стиль_имя=a.стиль)
-            выход = a.выход or config.ROOT / 'out' / (Path(a.эпизод).resolve().name + (f'--{Path(a.стиль).stem}' if a.стиль else '') + '.mp4')
+            выход = a.выход or Path.cwd() / 'out' / (Path(a.эпизод).resolve().name + (f'--{Path(a.стиль).stem}' if a.стиль else '') + '.mp4')
             render.снять(папка, выход, fps=a.fps, потоков=a.потоков, кодек=a.кодек)
     except config.ОшибкаКонфига as e:
         sys.exit(f'Ошибка: {e}')

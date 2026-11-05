@@ -21,8 +21,8 @@ function mailWall(g, dur, { n = 16, seed = 11 } = {}) {
   for (let i = 0; i < n; i++) {
     const x = 60 + R() * 100, y0 = 120 + i * 230, c = G(g, { x, y: y0, o: .55 });
     rect(c, 0, 0, 680, 124, { fill: PNL, stroke: EDG, 'stroke-width': 3, rx: 16 });
-    T(c, 'RE: ВАШ ОТКЛИК', { x: 28, y: 44, size: 26, fill: MUTED, font: SANS, weight: 500 });
-    T(c, REFUSALS[i % REFUSALS.length], { x: 28, y: 95, size: 34, fill: LIGHT, font: SANS, weight: 600 });
+    T(c, 'RE: ВАШ ОТКЛИК', { x: 28, y: 44, size: 26, fill: MUTED, font: SANS, weight: 500 }).setAttribute('data-decor', '1');   // фоновая текстура, не «слова»
+    T(c, REFUSALS[i % REFUSALS.length], { x: 28, y: 95, size: 34, fill: LIGHT, font: SANS, weight: 600 }).setAttribute('data-decor', '1');
     tw(c, { y: y0 - 1800 }, 0, dur, lin);
   }
 }
