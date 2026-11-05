@@ -134,6 +134,9 @@ function prog(f, t0, dur, ease = lin) {
   CUR.end = Math.max(CUR.end, t0 + dur);
 }
 
+// tick(f): f(t) на каждом кадре со временем бита t (секунды). Бит не растягивает — для постоянного движения: качание, вращение, мерцание
+function tick(f) { CUR.ticks.push(f); }
+
 // звуковой эффект на часах бита; файл — sfx/<имя>.mp3; громкость 1 — обычная (в смеси половина от голоса)
 function sfx(_beat, t, name, vol = 1) { if (CUR) CUR.sfx.push({ t, name, vol }); }
 
@@ -149,7 +152,7 @@ function buildBeats(defs) {
     if (!tm) throw new Error(`Для бита «${id}» нет времён озвучки (timings): запустите озвучку или сборку`);
     const pre = extra.pre || 0;
     const p = mk('g', { display: 'none' }, svg);
-    CUR = { id, title, panel: p, els: new Set(), progs: [], sfx: [], end: 0, pre, dur: tm.dur, start };
+    CUR = { id, title, panel: p, els: new Set(), progs: [], ticks: [], sfx: [], end: 0, pre, dur: tm.dur, start };
     BEAT_ID = id;
     // m('метка', сдвиг): время начала слова после [[метка]] на часах бита (с опережением LEAD)
     const m = (name, off = 0) => {
@@ -175,6 +178,7 @@ function evalBeat(b, lt) {
     paint(e, v);
   }
   for (const p of b.progs) p.f(p.ease(clamp01((lt - p.t0) / p.dur)));
+  for (const f of b.ticks) f(lt);
   RENDERING = false;
 }
 

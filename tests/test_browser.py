@@ -66,3 +66,49 @@ start(BEATS);
             br.close()
     finally:
         srv.shutdown()
+
+
+@pytest.mark.browser
+def test_облики_героев_и_tick_не_растягивает_бит(мини, tmp_path):
+    """Герои с доспехом, татуировками, комплекцией, усами и ледяными глазами рисуются без ошибок; tick (вечное качание) не удлиняет бит."""
+    (мини / 'episode.yaml').write_text("""название: Облики
+стиль: dark-yard
+скрипты: [scenes.js]
+герои:
+  олег: {доспех: "#475569", плащ: "#1e3a8a", тату: "#0b1220", руки: true, глаза: "#38bdf8", длинные_волосы: true, брови: "#8b93a3"}
+  камиль: {усы: 1, очки: true, надпись: "Py", цвет_надписи: "#facc15"}
+  серёга: {лысый: true, щетина_на_голове: true, руки: true, комплекция: 1.5, надпись: "CODEX"}
+""", encoding='utf-8')
+    (мини / 'scenes.js').write_text("""'use strict';
+const BEATS = [['один', 'Тест', (m, D) => {
+  const p = panel(0), s = shot(p, 0, undefined, { bg: DARK });
+  const g = G(s, {}); tick(t => g.setAttribute('transform', `translate(${Math.sin(t) * 5} 0)`));
+  hero(s, 'олег', 150, 800, .8, [[0, 'stern']], 0, D);
+  hero(s, 'камиль', 450, 900, .8, [[0, 'smug']], 0, D);
+  hero(s, 'серёга', 750, 800, .8, [[0, 'rage']], 0, D);
+  finish(p); caps(p, 'один');
+}]];
+start(BEATS);
+""", encoding='utf-8')
+    вых = build.собрать(мини, выход=config.ROOT / 'build' / 'тест-облики')
+    srv, порт = serve.запустить(вых)
+    ошибки = []
+    try:
+        with playwright.sync_playwright() as p:
+            try:
+                br = p.chromium.launch()
+            except Exception as e:
+                pytest.skip(f'нет Chromium: {e}')
+            page = br.new_page(viewport={'width': 450, 'height': 800})
+            page.on('pageerror', lambda e: ошибки.append(str(e)))
+            page.on('console', lambda m: ошибки.append(m.text) if m.type == 'error' else None)
+            page.goto(f'http://127.0.0.1:{порт}/index.html?clean')
+            page.wait_for_function('window.MM && window.MM.ready', timeout=60000)
+            man = page.evaluate('MM.manifest()')
+            assert man['duration'] < 5, f'tick растянул бит до {man["duration"]} с'
+            page.evaluate('t => MM.seek(t)', 1.0)
+            assert len(page.screenshot()) > 5000
+            br.close()
+    finally:
+        srv.shutdown()
+    assert not ошибки, ошибки

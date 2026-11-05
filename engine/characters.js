@@ -48,8 +48,13 @@ let faceN = 0;
 /* face(g, x, y, s, keys, t0, t1, opts): герой по пояс; x, y — центр головы, s — масштаб.
    keys — [[t, 'emo', {добавки}], …] во времени бита; t0..t1 — когда кадр живёт (рисуется на этом отрезке);
    opts: skin, hair (цвет), seed (сдвиг моргания), glasses (0 — без очков), in (когда выпрыгивает), tilt,
-         hoodCol, suit (цвет пиджака) + tie + shirt, bald, longHair, lips, noNose, box (коробка с вещами в руках) */
+         hoodCol, suit (цвет пиджака) + tie + shirt, bald, longHair, lips, noNose, box (коробка с вещами в руках);
+         облик: armor (цвет доспеха: наплечники с шипами, нагрудник, плащ cloak), arms (голые руки), tattoo (цвет татуировок на руках и шее),
+         build (ширина торса и рук, 1 — обычный, 1.5 — качок), mustache (усы), buzz (бритая голова со щетиной), eyeCol (цвет радужки),
+         browCol (цвет бровей), emblem + emblemCol (надпись на толстовке вместо </>) */
 function face(g, x, y, s, keys, t0, t1, o = {}) {
+  const build = o.build || 1, nk = 1 + (build - 1) * .8;
+  const shade = (hex, k) => '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
   const id = ++faceN, skin = o.skin || SKIN, hairC = o.hair || HAIR_COL, seed = o.seed || 0, glasses = o.glasses === undefined ? 1 : o.glasses;
   keys = keys.map(([t, name, over]) => ({ t, p: { ...EMO0, ...(EMO[name] || {}), ...(over || {}) } }));
   const R = G(g, o.in === undefined ? { x, y, s } : { x, y, s: s * .7, o: 0 });
@@ -57,11 +62,13 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
 
   // тело: Петя в толстовке, Петрович в комбинезоне поверх майки (переключаются по rank); массовка — в пиджаке (suit)
   const B = mk('g', {}, R), torso = 'M -196 340 C -196 232 -124 176 -46 166 L 46 166 C 124 176 196 232 196 340 Z';
+  if (o.armor) mk('path', { d: 'M -190 340 L -240 206 C -150 112 150 112 240 206 L 190 340 Z', fill: o.cloak || '#1e3a8a', ...LINE }, B);   // плащ
   const hood = mk('g', {}, B);
   mk('ellipse', { cx: 0, cy: 150, rx: 118, ry: 56, fill: '#334155', ...LINE }, hood);
   mk('path', { d: torso, fill: o.hoodCol || '#475569', ...LINE }, hood);
   mk('path', { d: 'M -22 172 L -30 252 M 22 172 L 30 252', stroke: '#e2e8f0', 'stroke-width': 6, 'stroke-linecap': 'round', fill: 'none' }, hood);
-  T(hood, '</>', { x: 0, y: 312, size: 58, fill: ACCENT, font: MONO, weight: 700, anchor: 'middle' }).setAttribute('data-decor', '1');   // украшение: проверка безопасной зоны его пропускает
+  const emb = o.emblem || '</>';
+  T(hood, emb, { x: 0, y: 312, size: emb.length > 3 ? 44 : 58, fill: o.emblemCol || ACCENT, font: MONO, weight: 700, anchor: 'middle' }).setAttribute('data-decor', '1');   // украшение: проверка безопасной зоны его пропускает
   const ov = mk('g', { opacity: 0 }, B);
   mk('path', { d: torso, fill: '#e2e8f0', ...LINE }, ov);
   mk('path', { d: 'M -150 340 L -150 252 L -100 210 L 100 210 L 150 252 L 150 340 Z', fill: '#2563eb', ...LINE }, ov);
@@ -74,7 +81,42 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
     mk('path', { d: 'M -64 168 L 0 270 L 64 168 Z', fill: o.shirt || '#f1f5f9', ...LINE }, suit);
     if (o.tie) mk('path', { d: 'M -16 190 L 16 190 L 24 300 L 0 336 L -24 300 Z', fill: o.tie, ...LINE }, suit);
   }
-  mk('rect', { x: -34, y: 80, width: 68, height: 110, rx: 20, fill: SKIN_SH, ...LINE }, R);   // шея поверх воротника
+  // голые руки (капсулы: тёмная обводка + кожа), с татуировками по предплечью
+  if (o.arms || o.tattoo) {
+    const aw = 52 * build;
+    [-1, 1].forEach(sd => {
+      const x0 = sd * 196, x1 = sd * (212 + (build - 1) * 24);
+      mk('path', { d: `M ${x0} 238 L ${x1} 352`, stroke: INK, 'stroke-width': aw + 12, 'stroke-linecap': 'round', fill: 'none' }, B);
+      mk('path', { d: `M ${x0} 238 L ${x1} 352`, stroke: skin, 'stroke-width': aw, 'stroke-linecap': 'round', fill: 'none' }, B);
+      if (build > 1.2) mk('ellipse', { cx: x0 + sd * 6, cy: 272, rx: aw * .36, ry: 34, fill: 'rgba(255,255,255,.12)' }, B);   // блик на бицепсе
+      if (o.tattoo) {
+        const t = mk('g', { stroke: o.tattoo, 'stroke-width': 5, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, B);
+        for (let k = 0; k < 4; k++) {
+          const y = 262 + k * 24, cx = x0 + (x1 - x0) * (y - 238) / 114;
+          mk('path', { d: `M ${cx - 17} ${y} L ${cx - 5} ${y + 11} L ${cx + 5} ${y - 2} L ${cx + 17} ${y + 10}`, }, t);
+        }
+        mk('path', { d: `M ${x0 - 14} 236 C ${x0 + sd * 12} 252 ${x0 - sd * 6} 276 ${x0 + sd * 14} 292 M ${x0} 238 L ${x0} 330`, 'stroke-width': 3, opacity: .7 }, t);
+        mk('circle', { cx: x1, cy: 340, r: 6, fill: o.tattoo, stroke: 'none' }, t);
+      }
+    });
+  }
+  // доспех: подкладка, нагрудник с ледяными прожилками, высокий воротник, наплечники с шипами
+  const armor = o.armor ? mk('g', {}, B) : null;
+  if (armor) {
+    const st = typeof o.armor === 'string' ? o.armor : '#475569';
+    mk('path', { d: torso, fill: '#1f2937', ...LINE }, armor);
+    mk('path', { d: 'M -150 340 L -140 236 Q 0 200 140 236 L 150 340 Z', fill: st, ...LINE }, armor);
+    mk('path', { d: 'M 0 214 L 0 340 M -72 252 L -52 340 M 72 252 L 52 340', stroke: '#7dd3fc', 'stroke-width': 7, 'stroke-linecap': 'round', fill: 'none' }, armor);
+    mk('ellipse', { cx: 0, cy: 170, rx: 100, ry: 40, fill: st, ...LINE }, armor);
+    [-1, 1].forEach(sd => {
+      mk('path', { d: `M ${sd * 150} 176 L ${sd * 176} 70 L ${sd * 214} 184 Z M ${sd * 214} 196 L ${sd * 286} 128 L ${sd * 262} 232 Z`, fill: '#94a3b8', ...LINE }, armor);   // шипы
+      mk('path', { d: `M ${sd * 86} 190 C ${sd * 170} 148 ${sd * 250} 184 ${sd * 258} 266 C ${sd * 206} 292 ${sd * 140} 268 ${sd * 96} 244 Z`, fill: st, ...LINE }, armor);   // наплечник
+      mk('path', { d: `M ${sd * 118} 200 Q ${sd * 180} 192 ${sd * 232} 236`, stroke: '#7dd3fc', 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, armor);
+    });
+  }
+  [hood, ov, suit, armor].forEach(g => g && build !== 1 && g.setAttribute('transform', `scale(${build} 1)`));
+  mk('rect', { x: -34 * nk, y: 80, width: 68 * nk, height: 110, rx: 20, fill: o.skin ? shade(o.skin, .9) : SKIN_SH, ...LINE }, R);   // шея поверх воротника
+  if (o.tattoo) mk('path', { d: 'M -22 126 L -10 142 L -22 158 M 22 126 L 10 142 L 22 158', stroke: o.tattoo, 'stroke-width': 5, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, R);
 
   // коробка с вещами из офиса: растение, кружка, резиновая уточка
   if (o.box) {
@@ -93,7 +135,10 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
 
   // голова: волосы сзади, уши, лицо, потом щетина / нос / глаза / рот / волосы / кепка / очки
   const H = mk('g', {}, R);
-  if (o.longHair) mk('path', { d: 'M -140 -50 C -176 120 -160 210 -112 224 L 112 224 C 160 210 176 120 140 -50 C 128 -160 -128 -160 -140 -50 Z', fill: hairC, ...LINE }, H);
+  if (o.longHair && o.armor) {                         // длинные волосы с доспехом: две пряди по бокам лица падают на плечи
+    mk('path', { d: 'M -122 -60 C -152 20 -156 150 -142 246 C -126 272 -102 258 -98 232 L -90 60 L 90 60 L 98 232 C 102 258 126 272 142 246 C 156 150 152 20 122 -60 Z', fill: hairC, ...LINE }, H);
+    mk('path', { d: 'M -138 30 C -146 110 -140 190 -128 238 M -114 60 C -120 130 -116 190 -112 232 M 138 30 C 146 110 140 190 128 238 M 114 60 C 120 130 116 190 112 232', stroke: 'rgba(15,23,42,.35)', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }, H);
+  } else if (o.longHair) mk('path', { d: 'M -140 -50 C -176 120 -160 210 -112 224 L 112 224 C 160 210 176 120 140 -50 C 128 -160 -128 -160 -140 -50 Z', fill: hairC, ...LINE }, H);
   mk('circle', { cx: -122, cy: 8, r: 26, fill: skin, ...LINE }, H); mk('circle', { cx: 122, cy: 8, r: 26, fill: skin, ...LINE }, H);
   mk('circle', { cx: 0, cy: 0, r: 122, fill: skin, ...LINE }, H);
   const blush = [-1, 1].map(sd => mk('ellipse', { cx: sd * 80, cy: 42, rx: 28, ry: 17, fill: '#ef4444', opacity: 0 }, H));
@@ -106,13 +151,14 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
     const e = mk('g', { transform: `translate(${sd * 50} -8)` }, H);
     const white = mk('ellipse', { cx: 0, cy: 0, rx: 31, ry: 35, fill: '#fff', stroke: INK, 'stroke-width': 4 }, e);
     const pup = mk('g', {}, e);
-    mk('circle', { cx: 0, cy: 0, r: 14, fill: '#1c1917' }, pup); mk('circle', { cx: 4, cy: -5, r: 4.5, fill: '#fff' }, pup);
+    if (o.eyeCol) { mk('circle', { cx: 0, cy: 0, r: 25, fill: o.eyeCol, opacity: .9 }, pup); mk('circle', { cx: 0, cy: 0, r: 17, fill: '#e0f7ff' }, pup); mk('circle', { cx: 0, cy: 0, r: 8, fill: '#0b1220' }, pup); }
+    else { mk('circle', { cx: 0, cy: 0, r: 14, fill: '#1c1917' }, pup); mk('circle', { cx: 4, cy: -5, r: 4.5, fill: '#fff' }, pup); }
     const lid = mk('rect', { x: -38, y: -38, width: 76, height: 0, fill: skin }, e);
     const line = mk('path', { d: 'M -26 2 Q 0 16 26 2', stroke: INK, 'stroke-width': 6, 'stroke-linecap': 'round', fill: 'none', opacity: 0 }, e);
     const bag = mk('path', { d: `M ${sd * 22} 36 Q ${sd * 0} 52 ${-sd * 22} 36`, stroke: '#c38663', 'stroke-width': 7, 'stroke-linecap': 'round', fill: 'none', opacity: 0 }, e);
     return { sd, white, pup, lid, line, bag };
   });
-  const brows = [-1, 1].map(() => mk('path', { stroke: hairC, 'stroke-width': 15, 'stroke-linecap': 'round', fill: 'none' }, H));
+  const brows = [-1, 1].map(() => mk('path', { stroke: o.browCol || hairC, 'stroke-width': 15, 'stroke-linecap': 'round', fill: 'none' }, H));
   const tears = [-1, 1].map(sd => [0, 1].map(i => mk('ellipse', { rx: 8, ry: 12, fill: '#7dd3fc', opacity: 0, cx: sd * 58 + (i ? 7 : -7) }, H)));
   const sweat = mk('path', { d: 'M 0 -18 C 14 2 14 16 0 16 C -14 16 -14 2 0 -18 Z', fill: '#7dd3fc', opacity: 0 }, H);
   const glass = mk('g', { opacity: glasses }, H);
@@ -129,12 +175,17 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
   const inner = mk('g', { 'clip-path': `url(#mc${id})` }, mouthG);
   const tongue = mk('ellipse', { cx: 0, cy: 0, rx: 30, ry: 14, fill: '#f43f5e', opacity: 0 }, inner);
   const teeth = [0, 1, 2, 3, 4, 5].map(k => mk('rect', { x: -102 + k * 34 + 1, y: 0, width: 32, height: 34, rx: 8, fill: '#f8fafc', stroke: '#cbd5e1', 'stroke-width': 2, opacity: 0 }, inner));
-  const must = mk('path', { d: 'M -66 54 C -52 34 -14 38 0 52 C 14 38 52 34 66 54 C 50 76 16 68 0 60 C -16 68 -50 76 -66 54 Z', fill: hairC, opacity: 0 }, H);
+  const must = mk('path', { d: 'M -66 54 C -52 34 -14 38 0 52 C 14 38 52 34 66 54 C 50 76 16 68 0 60 C -16 68 -50 76 -66 54 Z', fill: o.mustCol || hairC, opacity: 0, ...(o.mustache ? LINE : {}), 'stroke-width': 4 }, H);
 
   // волосы и кепка
   const hair = mk('g', { opacity: o.bald ? 0 : 1 }, H);
   mk('path', { d: 'M -128 -22 C -142 -150 -62 -198 4 -192 C 84 -198 144 -132 128 -22 C 112 -68 84 -92 46 -88 C 28 -116 -22 -114 -44 -84 C -84 -96 -114 -66 -128 -22 Z', fill: hairC, ...LINE }, hair);
   if (!o.longHair) mk('path', { d: 'M -60 -176 L -88 -236 L -22 -190 Z M 10 -190 L 4 -254 L 54 -186 Z M 74 -170 L 116 -226 L 114 -148 Z', fill: hairC, ...LINE }, hair);
+  if (o.buzz) {            // бритая голова: тёмная тень от линии волос и щетина по макушке
+    const bz = mk('g', {}, H), Rb = seeded(77 + id);
+    mk('path', { d: 'M -118 -30 C -128 -128 128 -128 118 -30 C 98 -84 -98 -84 -118 -30 Z', fill: hairC, opacity: .5 }, bz);
+    for (let i = 0; i < 70; i++) { const a = Math.PI * (1.27 + Rb() * .46), rr = 98 + Rb() * 18; mk('circle', { cx: Math.cos(a) * rr, cy: Math.sin(a) * rr, r: 2.6, fill: hairC, opacity: .8 }, bz); }
+  }
   const cap = mk('g', { opacity: 0 }, H);
   mk('path', { d: 'M -132 -34 C -136 -152 -50 -178 14 -174 C 98 -170 140 -116 136 -34 C 90 -52 30 -62 -20 -58 C -70 -56 -108 -48 -132 -34 Z', fill: o.capCol || '#374151', ...LINE }, cap);
   mk('path', { d: 'M -10 -52 C 50 -72 124 -62 162 -38 C 130 -22 50 -30 -10 -46 Z', fill: '#1f2937', ...LINE }, cap);
@@ -152,14 +203,14 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
   const render = tau => {
     const p = emoAt(keys, tau), tt = tau + seed, ph = tt % 3.3, blink = ph < .13 ? Math.sin(ph / .13 * Math.PI) : 0;
     B.setAttribute('transform', `translate(0 ${Math.sin(tt * 2.2) * 3}) scale(1 ${1 + Math.sin(tt * 2.2) * .012})`);
-    hood.setAttribute('opacity', suit ? 0 : 1 - p.rank); ov.setAttribute('opacity', suit ? 0 : p.rank);
+    hood.setAttribute('opacity', suit || armor ? 0 : 1 - p.rank); ov.setAttribute('opacity', suit || armor ? 0 : p.rank);
     H.setAttribute('transform', `translate(${p.shk ? Math.sin(tt * 46) * p.shk : 0} ${Math.sin(tt * 2.2 + 1) * 2}) rotate(${p.r + (o.tilt || 0) + Math.sin(tt * 1.3) * 1.2})`);
     hair.setAttribute('opacity', (o.bald ? 0 : 1) * (1 - p.rank) * (1 - p.helm));
     hair.setAttribute('transform', `rotate(${Math.sin(tt * 2.6) * 1.4 * (1 + p.hair * 3)}) translate(0 ${-p.hair * 20}) scale(${1 + p.hair * .05} ${1 + p.hair * .15})`);
     cap.setAttribute('opacity', p.rank > .02 && p.helm < .5 ? 1 : 0);
     hel.setAttribute('opacity', p.helm > .02 ? 1 : 0); hel.setAttribute('transform', `translate(0 ${-(1 - p.helm) * 320 - 8})`);
     visor.setAttribute('transform', `rotate(${-150 * (1 - p.mask)} 0 -58)`); cap.setAttribute('transform', `translate(0 ${-(1 - p.rank) * 320 - 14})`);
-    must.setAttribute('opacity', p.rank); stub.setAttribute('opacity', p.rank * .6); nose.setAttribute('opacity', o.noNose ? 0 : p.rank * .55);
+    must.setAttribute('opacity', Math.max(p.rank, o.mustache || 0)); stub.setAttribute('opacity', p.rank * .6); nose.setAttribute('opacity', o.noNose ? 0 : p.rank * .55);
     glass.setAttribute('opacity', glasses * (1 - p.rank) * (1 - p.shades)); shades.setAttribute('opacity', p.shades);
     blush.forEach(b => b.setAttribute('opacity', p.blush * .45));
     sweat.setAttribute('opacity', p.sweat); sweat.setAttribute('transform', `translate(94 ${-92 + ((tt * .8) % 1) * 46}) scale(${.6 + p.sweat * .3})`);
