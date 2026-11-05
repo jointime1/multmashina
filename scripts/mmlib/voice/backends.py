@@ -26,45 +26,72 @@ def _записать(wav, samples, sr):
     sf.write(str(wav), samples, sr)
 
 
+_МОДЕЛИ = {}          # загруженные модели: несколько голосов одного эпизода используют одну модель, а не грузят её заново
+
+
+def _загрузить(репо, как):
+    try:
+        import mlx.core as mx
+        from mlx_audio.tts.utils import load_model
+    except ImportError:
+        _нужен('mlx-audio', как)
+    if репо not in _МОДЕЛИ:
+        from .. import mem
+        try:
+            mem.проверить(5 if '8bit' in репо or '4bit' in репо else 9, f'модель озвучки {репо.split("/")[-1]}')
+        except MemoryError as e:
+            raise ОшибкаОзвучки(str(e))
+        mx.set_cache_limit(512 * 2 ** 20)         # кэш буферов MLX по умолчанию растёт без предела: держим его в 0,5 ГБ
+        mx.set_memory_limit(10 * 2 ** 30)
+        _МОДЕЛИ[репо] = load_model(репо)
+    return mx, _МОДЕЛИ[репо]
+
+
 class QwenКлон:
-    РЕПО = 'mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16'
+    РЕПО = 'mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit'      # 8 бит: ≈ вдвое меньше памяти, чем bf16; свою модель — озвучка → модель
+    ПАМЯТЬ_ГБ = 5
 
     def __init__(self, настройки, папка):
         self.н, self.папка = настройки, Path(папка)
+        self.РЕПО = настройки.get('модель', self.РЕПО)
         эталон = self.папка / настройки.get('эталон', 'voice/ref.wav')
         if not эталон.exists():
-            raise ОшибкаОзвучки(f'Нет эталонной записи {эталон}. Сделайте её бэкендом qwen-дизайн или положите свою (10–15 секунд чистой речи)')
+            raise ОшибкаОзвучки(f'Нет эталонной записи {эталон}. Сделайте её бэкендом qwen-дизайн (команда «образец») или положите свою (10–15 секунд чистой речи)')
         if not настройки.get('текст_эталона'):
             raise ОшибкаОзвучки('Для клона нужен текст_эталона: дословный текст того, что сказано в эталонной записи')
+        self.эталон = эталон
         try:
-            import mlx.core as mx
-            from mlx_audio.tts.utils import load_model
+            import soundfile as sf
+            сек, слов = sf.info(str(эталон)).duration, len(настройки['текст_эталона'].split())
+            if not .2 <= сек / max(1, слов) <= 1.2:
+                raise ОшибкаОзвучки(f'Текст эталона не соответствует записи {эталон.name}: в записи {сек:.0f} с, в тексте {слов} слов (норма ≈ 0,5 с на слово). '
+                                    'Частая причина: текст_эталона в YAML записан без кавычек внутри {…}, и запятая оборвала значение. Возьмите текст в кавычки')
         except ImportError:
-            _нужен('mlx-audio', 'uv run --extra voice --extra qwen python scripts/mm.py озвучить ' + self.папка.as_posix())
-        self.mx, self.эталон = mx, эталон
-        self.модель = load_model(self.РЕПО)
+            pass
+        self.mx, self.модель = _загрузить(self.РЕПО, 'uv run --extra voice --extra qwen python scripts/mm.py озвучить ' + self.папка.as_posix())
 
     def синтез(self, текст, wav):
         self.mx.random.seed(int(self.н.get('seed', 11)))
-        res = list(self.модель.generate(text=текст, ref_audio=str(self.эталон), ref_text=self.н['текст_эталона'], lang_code='russian'))
-        samples = np.concatenate([np.array(r.audio).reshape(-1) for r in res])
-        _записать(wav, samples, res[0].sample_rate)
+        слов = len(текст.split())
+        # потолок длины: ~12,5 кадра кодека в секунду, до ~1,6 с на слово; без него сбившаяся модель «говорит» минуту и раздувает память
+        res = list(self.модель.generate(text=текст, ref_audio=str(self.эталон), ref_text=self.н['текст_эталона'], lang_code='russian', max_tokens=20 * слов + 40))
+        samples = np.concatenate([np.array(r.audio).reshape(-1) for r in res]) if res else np.zeros(2400, dtype='float32')   # пусто = брак, его поймает проверка длины
+        _записать(wav, samples, res[0].sample_rate if res else 24000)
+        try:
+            self.mx.clear_cache()
+        except AttributeError:
+            pass
 
 
 class QwenДизайн(QwenКлон):
-    РЕПО = 'mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16'
+    РЕПО = 'mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit'
 
     def __init__(self, настройки, папка):
         self.н, self.папка = настройки, Path(папка)
+        self.РЕПО = настройки.get('модель', self.РЕПО)
         if not настройки.get('описание'):
             raise ОшибкаОзвучки('Для qwen-дизайн нужно «описание» голоса (лучше по-английски: возраст, тембр, манера речи)')
-        try:
-            import mlx.core as mx
-            from mlx_audio.tts.utils import load_model
-        except ImportError:
-            _нужен('mlx-audio', 'uv run --extra voice --extra qwen python scripts/mm.py озвучить ' + self.папка.as_posix() + ' --голос qwen-дизайн')
-        self.mx = mx
-        self.модель = load_model(self.РЕПО)
+        self.mx, self.модель = _загрузить(self.РЕПО, 'uv run --extra voice --extra qwen python scripts/mm.py озвучить ' + self.папка.as_posix() + ' --голос qwen-дизайн')
 
     def синтез(self, текст, wav):
         self.mx.random.seed(int(self.н.get('seed', 11)))

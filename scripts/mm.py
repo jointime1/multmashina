@@ -6,7 +6,8 @@
   python scripts/mm.py проверить examples/<эпизод>  ошибки в сценах, слова вне безопасной зоны, длины и темп речи
   python scripts/mm.py кадры examples/<эпизод>      контактные листы кадров: увидеть свою работу глазами
   python scripts/mm.py ассеты                        сгенерировать звуковые эффекты (assets/sfx) и зерно (assets/grain.png)
-  python scripts/mm.py озвучить examples/<эпизод>   озвучить биты выбранным голосом и выровнять слова
+  python scripts/mm.py образец voices/имя ...      образцы голоса по описанию (несколько вариантов) — выбрать тембр для клона
+  python scripts/mm.py озвучить examples/<эпизод>   озвучить биты выбранным голосом (или голосами героев) и выровнять слова
   python scripts/mm.py собрать examples/<эпизод>    собрать автономную страницу в build/<эпизод>
   python scripts/mm.py смотреть examples/<эпизод>   собрать и открыть предпросмотр в браузере (со звуком)
   python scripts/mm.py снять examples/<эпизод>      собрать и снять MP4 (1080×1920) + субтитры .srt
@@ -25,6 +26,8 @@ def парсер():
     sub = p.add_subparsers(dest='команда', required=True)
     sub.add_parser('ассеты')
     sub.add_parser('окружение')
+    ob = sub.add_parser('образец'); ob.add_argument('база', help='путь без расширения, например voices/олег'); ob.add_argument('--описание', required=True, help='голос словами, лучше по-английски')
+    ob.add_argument('--текст', required=True, help='что произнести (10–15 секунд речи; это же текст_эталона)'); ob.add_argument('--seeds', default='1,2,3', help='варианты, через запятую')
     n = sub.add_parser('новый'); n.add_argument('эпизод', help='куда создать, например examples/мой-ролик')
     n.add_argument('--стиль', default='dark-yard'); n.add_argument('--название')
     pr = sub.add_parser('проверить'); pr.add_argument('эпизод'); pr.add_argument('--стиль'); pr.add_argument('--строго', action='store_true', help='замечания тоже считать ошибкой')
@@ -54,6 +57,9 @@ def main():
         if a.команда == 'окружение':
             from mmlib import env
             sys.exit(env.проверить())
+        elif a.команда == 'образец':
+            from mmlib.voice import sample
+            sample.сделать(a.база, a.описание, a.текст, [int(x) for x in a.seeds.split(',')])
         elif a.команда == 'новый':
             from mmlib import new
             new.создать(a.эпизод, a.стиль, a.название)

@@ -5,6 +5,7 @@
 """
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -105,6 +106,11 @@ def _srt(сборка, man):
 
 def снять(сборка, mp4, fps=30, высота=1920, потоков=4, lufs=-14, кодек='libx264'):
     сборка, mp4 = Path(сборка).resolve(), Path(mp4).resolve()
+    from . import mem
+    есть = mem.доступно_гб()
+    if есть is not None and not os.environ.get('MM_IGNORE_MEMORY') and есть < потоков * 1.5 + 2:
+        потоков = max(1, int((есть - 2) // 1.5))
+        print(f'Памяти доступно ≈{есть:.0f} ГБ: снимаю в {потоков} браузер(а) вместо заказанных, чтобы не уходить в своп')
     srv, порт = serve.запустить(сборка)
     try:
         man = _манифест(порт)
