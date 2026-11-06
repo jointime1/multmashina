@@ -257,9 +257,14 @@ function flyTooth(g, x, y, t0, dx, dy, spin) {
   return e;
 }
 
-// герой по имени из стиля (раздел «герои»); остальные настройки поверх пресета
-function hero(g, name, x, y, s, keys, t0, t1, o = {}) {
+// внешность героя по имени: раздел «герои» стиля или эпизода
+function lookOf(name) {
   const look = (STYLE.characters || {})[name];
   if (!look) throw new Error(`Нет героя «${name}» в стиле. Есть: ${Object.keys(STYLE.characters || {}).join(', ') || '(пусто)'}`);
-  return face(g, x, y, s, keys, t0, t1, Object.assign({}, look, o));
+  return look;
+}
+
+// герой по имени из стиля; остальные настройки поверх пресета
+function hero(g, name, x, y, s, keys, t0, t1, o = {}) {
+  return face(g, x, y, s, keys, t0, t1, Object.assign({}, lookOf(name), o));
 }
