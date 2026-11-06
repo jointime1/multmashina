@@ -58,6 +58,27 @@ def test_setup_печатает_корень_репозитория():
     assert Path(r.stdout.strip()).resolve() == КОРЕНЬ.resolve()
 
 
+def test_setup_находит_репозиторий_через_ссылку_на_скилл(tmp_path):
+    """Проект может подключить живой скилл ссылкой: иначе setup.sh уйдёт в старый клон и правки движка до роликов не дойдут."""
+    ссылка = tmp_path / ".claude" / "skills" / "multmashina"
+    ссылка.parent.mkdir(parents=True)
+    ссылка.symlink_to(СКИЛЛ)
+    среда = {k: v for k, v in os.environ.items() if k != "MULTMASHINA_HOME"}
+    r = subprocess.run(["bash", str(ссылка / "setup.sh")], capture_output=True, text=True, timeout=60, env=среда)
+    assert Path(r.stdout.strip()).resolve() == КОРЕНЬ.resolve(), r.stdout + r.stderr
+
+
+def test_скилл_не_предписывает_одну_раскладку():
+    """Жёсткая привязка головы к y≈1000 в инструкции и сделала все ролики одинаковыми."""
+    assert "y≈1000" not in (СКИЛЛ / "SKILL.md").read_text(encoding="utf-8")
+    assert "ставьте на y" not in (КОРЕНЬ / "docs" / "scenes.md").read_text(encoding="utf-8")
+
+
+def test_скилл_требует_раскадровку_до_сцен():
+    t = (СКИЛЛ / "SKILL.md").read_text(encoding="utf-8")
+    assert "раскадровк" in t.lower() and t.lower().index("раскадровк") < t.index("scenes.js")
+
+
 def test_mm_sh_запускает_команды_из_любой_папки(tmp_path):
     sh = СКИЛЛ / 'mm.sh'
     assert os.access(sh, os.X_OK), 'mm.sh должен быть исполняемым'

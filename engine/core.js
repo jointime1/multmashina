@@ -118,9 +118,10 @@ function tw(e, to, t0, dur = .3, ease = io) {
   }
   reg(e);
   if (CUR) CUR.end = Math.max(CUR.end, t0 + dur);
+  markChange(t0, dur);
   return e;
 }
-const show = (e, t0, dur = .2, ease = lin) => tw(e, { o: 1 }, t0, dur, ease);
+const show =(e, t0, dur = .2, ease = lin) => tw(e, { o: 1 }, t0, dur, ease);
 const hide = (e, t0, dur = .2, ease = lin) => tw(e, { o: 0 }, t0, dur, ease);
 const draw = (e, t0, dur = .5, ease = out) => tw(e, { d: 1 }, t0, dur, ease);
 
@@ -135,6 +136,16 @@ function put(e, st) {
 function prog(f, t0, dur, ease = lin) {
   CUR.progs.push({ f, t0, dur: Math.max(dur, 1e-6), ease });
   CUR.end = Math.max(CUR.end, t0 + dur);
+  markChange(t0, dur);
+}
+
+// смена картинки на часах бита: по этим моментам проверка находит застывшие куски. Долгое движение отмечается каждую секунду: пока оно идёт, картинка живёт.
+// Субтитры, обновление героя (CUR.quiet) и фон на tick сменой не считаются.
+function markChange(t0, dur = 0) {
+  if (!CUR || CUR.quiet) return;
+  const end = t0 + Math.min(dur, 600);
+  for (let t = t0; t < end; t += 1) CUR.changes.push(t);
+  CUR.changes.push(end);
 }
 
 // tick(f): f(t) на каждом кадре со временем бита t (секунды). Бит не растягивает — для постоянного движения: качание, вращение, мерцание
@@ -155,7 +166,7 @@ function buildBeats(defs) {
     if (!tm) throw new Error(`Для бита «${id}» нет времён озвучки (timings): запустите озвучку или сборку`);
     const pre = extra.pre || 0;
     const p = mk('g', { display: 'none' }, svg), world = mk('g', {}, p), fixed = mk('g', {}, p);
-    CUR = { id, title, panel: p, world, fixed, idx, els: new Set(), progs: [], ticks: [], sfx: [], end: 0, pre, dur: tm.dur, start };
+    CUR = { id, title, panel: p, world, fixed, idx, els: new Set(), progs: [], ticks: [], sfx: [], changes: [], end: 0, pre, dur: tm.dur, start };
     BEAT_ID = id;
     // m('метка', сдвиг): время начала слова после [[метка]] на часах бита (с опережением LEAD)
     const m = (name, off = 0) => {
@@ -236,7 +247,7 @@ function manifest() {
   const total = BEAT_LIST.reduce((s, b) => s + b.len, 0);
   return {
     w: W, h: H, duration: total,
-    beats: BEAT_LIST.map(b => ({ id: b.id, start: b.start, len: b.len, voice_at: b.start + b.pre, voice_dur: b.dur })),
+    beats: BEAT_LIST.map(b => ({ id: b.id, start: b.start, len: b.len, voice_at: b.start + b.pre, voice_dur: b.dur, changes: [...new Set(b.changes.map(num))].sort((p, q) => p - q) })),
     sfx: BEAT_LIST.flatMap(b => b.sfx.map(s => ({ t: b.start + s.t, name: s.name, vol: s.vol }))),
   };
 }

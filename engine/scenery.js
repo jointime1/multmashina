@@ -25,6 +25,7 @@ function neonSign(g, text, x, y, size, col) {
 function room(g, spec, over = {}) {
   const base = typeof spec === 'string' ? (STYLE.rooms || {})[spec] : spec;
   if (!base) throw new Error(`Нет комнаты «${spec}» в стиле. Есть: ${Object.keys(STYLE.rooms || {}).join(', ') || '(пусто)'}`);
+  g.setAttribute('data-bg', typeof spec === 'string' ? spec : 'комната');          // по этой метке проверка считает, сколько длится один фон
   const { wall = '#3b4659', wall2 = '#212939', floor = '#232735', hz = 900, lampX = 640, glow = '#ffb347', sign, signCol = '#ffb347',
     signX = CX, signY = 270, signSize = 64, pipes = true, seed = 4 } = Object.assign({}, base, over);
   const Rn = seeded(seed);
@@ -55,6 +56,7 @@ function room(g, spec, over = {}) {
 
 // большой открытый офис: потолочные светильники, окна с вечерним городом, ряд столов с мониторами, вывеска компании
 function office(g, o = {}) {
+  g.setAttribute('data-bg', 'офис');
   const Rn = seeded(8), hz = 930, name = o.name || 'Компания', signCol = o.signCol || '#e879f9';
   // цвета берутся из раздела «офис» стиля
   const C = Object.assign({ wall: '#2c3748', wall2: '#1b2230', ceiling: '#10141c', floor: '#1a2030', glass1: '#14203a', glass2: '#41567f', bldg: '#0e1626' }, STYLE.office);
@@ -117,6 +119,12 @@ function note(g, t0, str) {
 
 // покачивание на месте: y0 ± amp с периодом period на отрезке t0..t0+dur (через tick: бит не растягивается, даже если dur больше бита)
 const bob = (e, y0, amp, period, t0, dur) => dur <= .05 ? null : tick(t => put(e, { y: y0 + amp * Math.sin(Math.min(Math.max(t - t0, 0), dur) / period * Math.PI * 2) }));
+
+// стол поверх героя: закрывает нижний край торса (ног у героя нет); вызывать после героя. Лежит в зоне, где у платформ подписи и кнопки
+function desk(g, y = 1290, colour = '#5b4636') {
+  rect(g, -20, y, W + 40, H - y + 20, { fill: colour, stroke: INK, 'stroke-width': 6 });
+  rect(g, -20, y + 14, W + 40, 6, { fill: 'rgba(255,255,255,.12)' });
+}
 
 // красная линия поверх (зачёркивание, крест)
 function strike(g, x1, y1, x2, y2, t0, { w = 28, colour = RED, dur = .25 } = {}) {

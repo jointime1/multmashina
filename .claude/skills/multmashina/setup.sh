@@ -6,7 +6,7 @@
 # (Имена переменных латиницей: bash не принимает кириллицу в идентификаторах.)
 set -euo pipefail
 
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"          # -P: настоящий путь, чтобы скилл, подключённый ссылкой, узнал свой репозиторий
 repo="$(cd "$here/../../.." 2>/dev/null && pwd || true)"
 if [ -n "$repo" ] && [ -f "$repo/scripts/mm.py" ] && [ -d "$repo/engine" ]; then
   echo "$repo"; exit 0

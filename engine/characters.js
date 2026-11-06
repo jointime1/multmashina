@@ -60,6 +60,7 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
   keys = keys.map(([t, name, over]) => ({ t, p: { ...EMO0, ...(EMO[name] || {}), ...(over || {}) } }));
   const own = o.enter && o.enter !== 'pop';                         // свой вход (drop, left, right, rise, zoom, spin) вместо прыжка по умолчанию
   const R = G(g, o.in === undefined || own ? { x, y, s } : { x, y, s: s * .7, o: 0 });
+  R.setAttribute('data-hero', '1');                                 // по этой метке проверка находит героев в кадре и считает план
   if (o.in !== undefined) { if (own) enter(R, o.enter, o.in, { x, y, s }); else tw(R, { s, o: 1 }, o.in, .3, back); sfx(BEAT_ID, o.in, 'thud', .5); }
 
   // тело: Петя в толстовке, Петрович в комбинезоне поверх майки (переключаются по rank); массовка — в пиджаке (suit)
@@ -204,6 +205,7 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
 
   // реакция: когда эмоция меняется, герой вздрагивает (голова подпрыгивает, тело на миг вытягивается) — оживляет разговорные сцены
   const punch = o.punch !== undefined ? o.punch : MO.punch, moved = keys.map((k, i) => i > 0 && JSON.stringify(k.p) !== JSON.stringify(keys[i - 1].p));
+  keys.forEach((k, i) => moved[i] && markChange(k.t));              // смена эмоции — тоже смена картинки
   const render = tau => {
     let bump = 0;
     if (punch) for (let k = 1; k < keys.length; k++) if (moved[k]) { const a = (tau - keys[k].t + .1) / .34; if (a >= 0 && a < 1) bump = Math.max(bump, Math.sin(a * Math.PI)); }
@@ -239,7 +241,9 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
     tongue.setAttribute('cy', (p.mc + p.ml) / 2 - 7); tongue.setAttribute('rx', p.mw * .5);
     tongue.setAttribute('opacity', Math.max(0, Math.min(1, (p.ml - p.mu - 40) / 40)));
   };
+  CUR.quiet = true;                                                 // герой обновляется каждый кадр, сменой картинки считаются только его события
   prog(q => render(t0 + q * (t1 - t0)), t0, t1 - t0, lin);
+  CUR.quiet = false;
   return R;
 }
 

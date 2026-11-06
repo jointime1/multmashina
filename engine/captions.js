@@ -7,6 +7,7 @@ const CAP = Object.assign({ y: 1228, size: 72, color: MARK, stroke: '#0b0d14', w
 function caps(p, id, pre = 0) {
   const ws = (window.WORDS || {})[id], dur = (window.TIMINGS[id] || {}).dur;
   if (!ws || !ws.length) return;
+  CUR.quiet = true;                                                   // смена субтитра — не смена картинки
   const конец = CUR.end;                                              // затухание последнего субтитра не должно удлинять бит
   // слова собираются в короткие группы: до CAP.words слов и CAP.chars знаков, новая группа после паузы длиннее CAP.gap
   const chunks = [];
@@ -27,4 +28,5 @@ function caps(p, id, pre = 0) {
     hide(e, t1, .05, lin);
   });
   CUR.end = конец;
+  CUR.quiet = false;
 }

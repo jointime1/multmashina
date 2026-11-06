@@ -1,4 +1,4 @@
-"""Новый эпизод из шаблона templates/episode: три бита, герой, комната, субтитры. Дальше его правят: текст, герои, сцены."""
+"""Новый эпизод из шаблона templates/episode: три бита разными планами, раскадровка, герой, субтитры. Дальше его правят: текст, герои, раскадровку, сцены."""
 import shutil
 from pathlib import Path
 
@@ -19,5 +19,5 @@ def создать(папка, стиль='dark-yard', название=None):
                 t = t.replace(k, v)
             f.write_text(t, encoding='utf-8')
     print(f'Эпизод создан: {папка}')
-    print('Дальше: поправьте narration.yaml и scenes.js, затем озвучьте (uv run --extra voice --extra edge python scripts/mm.py озвучить ' + str(папка) + '; '
+    print('Дальше: поправьте narration.yaml, заполните раскадровка.md, напишите по ней scenes.js, затем озвучьте (uv run --extra voice --extra edge python scripts/mm.py озвучить ' + str(папка) + '; '
           'вместо edge можно qwen или chatterbox, см. «окружение»), проверьте (проверить), посмотрите кадры (кадры) и снимите (снять).')
