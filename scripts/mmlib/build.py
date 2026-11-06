@@ -10,7 +10,7 @@ from pathlib import Path
 
 from . import config, gitignore
 
-ДВИЖОК = ['core.js', 'icons.js', 'kit.js', 'captions.js', 'scenery.js', 'characters.js', 'plans.js', 'player.js']   # порядок подключения
+ДВИЖОК = ['core.js', 'icons.js', 'kit.js', 'captions.js', 'scenery.js', 'manner.js', 'characters.js', 'plans.js', 'player.js']   # порядок подключения
 МЕТКА = re.compile(r'\[\[(\w+)\]\]')
 
 

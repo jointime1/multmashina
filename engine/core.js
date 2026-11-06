@@ -18,6 +18,8 @@ const W = STAGE.w, H = STAGE.h, CX = W / 2;
 const FX = Object.assign({ lead: .22, hold: .3, grain: true, vignette: .5 }, STYLE.effects);
 const LEAD = FX.lead;
 // движение: входы элементов, переходы между сценами, камера, реакция героев (стиль → анимации); по умолчанию всё выключено
+// манера рисунка (стиль → манера, engine/manner.js): по умолчанию всё как нарисовано
+const MN = Object.assign({ line: 1, wobble: 0, detail: .012, boil: 8, step: 0, tones: [], stepped: true, dots: 0, paper: '', flat: false, eyes: 'round', headW: 1, headH: 1, body: 1, neck: 1 }, STYLE.manner);
 const MO = Object.assign({ enters: [], trans: [], cam: [], camAmp: .04, transDur: .22, punch: 0 }, STYLE.motion);                                               // картинка опережает слово на LEAD секунд: на самом слове она уже «приехала»
 
 // ---------- плавности ----------
@@ -45,6 +47,8 @@ const num = v => Math.round(v * 1000) / 1000;
 function mk(tag, attrs = {}, parent) {
   const e = document.createElementNS(SVG_NS, tag);
   for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+  // толщина обводки из манеры: только тёмный контур, широкие штрихи (брови, лямки, руки) — это форма, а не линия
+  if (MN.line !== 1 && attrs.stroke === INK && attrs['stroke-width'] <= 12) e.setAttribute('stroke-width', num(attrs['stroke-width'] * MN.line));
   if (parent) parent.appendChild(e);
   return e;
 }
@@ -165,7 +169,8 @@ function buildBeats(defs) {
     const tm = (window.TIMINGS || {})[id];
     if (!tm) throw new Error(`Для бита «${id}» нет времён озвучки (timings): запустите озвучку или сборку`);
     const pre = extra.pre || 0;
-    const p = mk('g', { display: 'none' }, svg), world = mk('g', {}, p), fixed = mk('g', {}, p);
+    const p = mk('g', { display: 'none' }, svg), art = mk('g', {}, p), world = mk('g', {}, art), fixed = mk('g', {}, p);   // art стоит на месте: на нём фильтр манеры, камера двигает world
+    dress(art);
     CUR = { id, title, panel: p, world, fixed, idx, els: new Set(), progs: [], ticks: [], sfx: [], changes: [], end: 0, pre, dur: tm.dur, start };
     BEAT_ID = id;
     // m('метка', сдвиг): время начала слова после [[метка]] на часах бита (с опережением LEAD)
@@ -223,7 +228,11 @@ function motion(b, lt, leave) {
   if (op < 1) w.setAttribute('opacity', num(op)); else w.removeAttribute('opacity');
 }
 let shown = [];
+// анимация рывками: время кадра падает на ступень, кадры внутри ступени совпадают (рендер их не снимает, см. план_съёмки в render.py)
+const snap = t => MN.step > 0 ? Math.floor(t * MN.step + 1e-6) / MN.step : t;
 function renderAt(t) {
+  t = snap(t);
+  mannerFrame(t);
   let bi = BEAT_LIST.findIndex(x => t < x.start + x.len);
   if (bi < 0) bi = BEAT_LIST.length - 1;
   const b = BEAT_LIST[bi], lt = Math.min(t - b.start, b.len), u = clamp01(lt / MO.transDur);
@@ -246,7 +255,7 @@ function renderAt(t) {
 function manifest() {
   const total = BEAT_LIST.reduce((s, b) => s + b.len, 0);
   return {
-    w: W, h: H, duration: total,
+    w: W, h: H, duration: total, step: MN.step,
     beats: BEAT_LIST.map(b => ({ id: b.id, start: b.start, len: b.len, voice_at: b.start + b.pre, voice_dur: b.dur, changes: [...new Set(b.changes.map(num))].sort((p, q) => p - q) })),
     sfx: BEAT_LIST.flatMap(b => b.sfx.map(s => ({ t: b.start + s.t, name: s.name, vol: s.vol }))),
   };

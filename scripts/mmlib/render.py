@@ -22,7 +22,20 @@ SR = 44100
 ГРОМКОСТЬ_ЭФФЕКТОВ = .25     # эффекты тише голоса; множитель на «громкость» из sfx(...)
 
 
-def _снять_кадры(порт, диапазон, ширина, высота, fps, папка):
+def план_съёмки(a, b, fps, шаг):
+    """Кадры a..b как [(номер, снимать ли)]. При анимации рывками соседние кадры совпадают: повтор — копия предыдущего файла, так дрожь не удлиняет рендер.
+    Ступень считается той же формулой, что snap в engine/core.js. Первый кадр отрезка снимается всегда: у каждого браузера свой отрезок."""
+    if not шаг:
+        return [(i, True) for i in range(a, b)]
+    res, было = [], None
+    for i in range(a, b):
+        ступень = math.floor(i / fps * шаг + 1e-6)
+        res.append((i, ступень != было))
+        было = ступень
+    return res
+
+
+def _снять_кадры(порт, диапазон, ширина, высота, fps, папка, шаг=0):
     from playwright.sync_api import sync_playwright
     a, b = диапазон
     with sync_playwright() as p:
@@ -30,9 +43,12 @@ def _снять_кадры(порт, диапазон, ширина, высот�
         page = br.new_context(viewport={'width': ширина, 'height': высота}, device_scale_factor=1).new_page()
         page.goto(f'http://127.0.0.1:{порт}/index.html?clean')
         page.wait_for_function('window.MM && window.MM.ready', timeout=120000)
-        for i in range(a, b):
-            page.evaluate('t => MM.seek(t)', i / fps)
-            page.screenshot(path=str(папка / f'{i:06d}.jpg'), type='jpeg', quality=93)
+        for i, снимать in план_съёмки(a, b, fps, шаг):
+            if снимать:
+                page.evaluate('t => MM.seek(t)', i / fps)
+                page.screenshot(path=str(папка / f'{i:06d}.jpg'), type='jpeg', quality=93)
+            else:
+                os.link(папка / f'{i - 1:06d}.jpg', папка / f'{i:06d}.jpg')
         br.close()
     return b - a
 
@@ -122,7 +138,7 @@ def снять(сборка, mp4, fps=30, высота=1920, потоков=4, l
             шаг = int(math.ceil(n / потоков))
             части = [(i, min(i + шаг, n)) for i in range(0, n, шаг)]
             with ProcessPoolExecutor(max_workers=потоков) as ex:
-                готово = sum(ex.map(_снять_кадры, [порт] * len(части), части, [ширина] * len(части), [высота] * len(части), [fps] * len(части), [td] * len(части)))
+                готово = sum(ex.map(_снять_кадры, [порт] * len(части), части, [ширина] * len(части), [высота] * len(части), [fps] * len(части), [td] * len(части), [man.get('step', 0)] * len(части)))
             print(f'Снято кадров: {готово}')
             _звук(сборка, man, td / 'audio.wav')
             mp4.parent.mkdir(parents=True, exist_ok=True)

@@ -40,8 +40,8 @@ function closeUp(g, name, keys, t0, t1, o = {}) {
 function eyes(g, name, keys, t0, t1, o = {}) {
   tagPlan(g, 'сверхкрупно');
   const el = hero(g, name, CX, 675, 4.4, keys, t0, t1, { punch: 0, ...o });
-  rect(g, -20, -20, W + 40, 380, { fill: '#05070c' });
-  rect(g, -20, 900, W + 40, H - 880, { fill: '#05070c' });
+  rect(g, -20, -20, W + 40, 380, { fill: DARK });                   // шторки цвета фона: на них читаются те же надписи, что и на обычном кадре
+  rect(g, -20, 900, W + 40, H - 880, { fill: DARK });
   return { el, text: [CX, 250], size: 150 };
 }
 
@@ -105,20 +105,20 @@ function inset(g, name, keys, t0, t1, o = {}) {
 // o: to — куда идёт, t0, t1 — когда, run — бегом, phase — сдвиг шага, чтобы толпа шла вразнобой
 function figure(g, name, x, y, s = .5, o = {}) {
   const c = tones(name), moving = o.to !== undefined, dir = moving ? Math.sign(o.to - x) || 1 : 0;
-  const t0 = o.t0 || 0, t1 = o.t1 === undefined ? t0 + 2 : o.t1, rate = o.run ? 10 : 6, amp = o.run ? 42 : 26, b = c.o.build || 1;
+  const t0 = o.t0 || 0, t1 = o.t1 === undefined ? t0 + 2 : o.t1, rate = o.run ? 10 : 6, amp = o.run ? 42 : 26, b = (c.o.build || 1) * MN.body;
   const e = G(g, { x, y, s });
   e.setAttribute('data-hero', '1');
   const body = mk('g', {}, e);
   const limb = (px, py, len, w, col, foot) => {
     const l = mk('g', {}, body);
-    mk('path', { d: `M ${px} ${py} L ${px} ${py + len}`, stroke: INK, 'stroke-width': w + 12, 'stroke-linecap': 'round', fill: 'none' }, l);
+    mk('path', { d: `M ${px} ${py} L ${px} ${py + len}`, stroke: INK, 'stroke-width': w + 12 * MN.line, 'stroke-linecap': 'round', fill: 'none' }, l);
     mk('path', { d: `M ${px} ${py} L ${px} ${py + len}`, stroke: col, 'stroke-width': w, 'stroke-linecap': 'round', fill: 'none' }, l);
     if (foot) mk('ellipse', { cx: px + (dir || 1) * 16, cy: py + len + 12, rx: 44, ry: 20, fill: '#111827', stroke: INK, 'stroke-width': 6 }, l);
     return l;
   };
   const armB = limb(-58 * b, -395, 170, 40 * b, c.o.arms ? c.skin : c.body), legB = limb(-30, -240, 228, 56, '#1f2937', true), legF = limb(30, -240, 228, 56, '#273449', true);
   mk('rect', { x: -66 * b, y: -424, width: 132 * b, height: 212, rx: 44, fill: c.body, ...LINE }, body);
-  const fx = dir * 16, head = mk('g', {}, body);
+  const fx = dir * 16, head = mk('g', { 'data-head': 1, transform: `translate(0 -520) scale(${MN.headW} ${MN.headH}) translate(0 520)` }, body);
   if (c.long) mk('path', { d: 'M -100 -560 C -124 -470 -112 -400 -84 -386 L 84 -386 C 112 -400 124 -470 100 -560 Z', fill: c.hair, ...LINE }, head);
   mk('circle', { cx: 0, cy: -520, r: 92, fill: c.skin, ...LINE }, head);
   [-1, 1].forEach(sd => mk('circle', { cx: fx + sd * 32, cy: -530, r: 10, fill: o.eye || '#1c1917' }, head));
@@ -188,7 +188,7 @@ function headTop(g, name, x, y, s, r = 0) {
 function chat(g, title, msgs, o = {}) {
   tagPlan(g, 'экран');
   const size = o.size || 54, lh = size * 1.28, top = 290, bottom = 1130, list0 = G(g, {});
-  const bg = rect(list0, -20, -2000, W + 40, H + 4000, { fill: o.bg || '#0f172a' });
+  const bg = rect(list0, -20, -2000, W + 40, H + 4000, { fill: o.bg || DARK });
   bg.setAttribute('data-decor', '1');
   const list = G(list0, {});
   let y = top;
@@ -234,7 +234,7 @@ function panels(g, n, o = {}) {
   tagPlan(g, 'комикс');
   const gap = o.gap === undefined ? 14 : o.gap, bottom = 1150, h = (bottom - gap * n) / n, at = o.at || [], mid = bottom / 2, slant = 90;
   rect(g, -20, -20, W + 40, H + 40, { fill: o.gutter || INK });
-  rect(g, -20, bottom, W + 40, H - bottom + 20, { fill: INK });         // полоса субтитров всегда тёмная: на ней читаются любые
+  rect(g, -20, bottom, W + 40, H - bottom + 20, { fill: CAP.stroke });  // полоса цвета обводки субтитров: на ней они читаются в любой манере
   return Array.from({ length: n }, (_, i) => {
     const y = gap + i * (h + gap), id = 'mmpn' + (++sceneN), clip = mk('clipPath', { id }, gdefs(g));
     if (o.diag && n === 2) mk('path', { d: i ? `M 0 ${mid + slant + gap} L ${W} ${mid - slant + gap} V ${bottom} H 0 Z` : `M 0 0 H ${W} V ${mid - slant - gap} L 0 ${mid + slant - gap} Z` }, clip);

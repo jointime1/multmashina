@@ -95,6 +95,7 @@ async function start(defs) {
   // шрифты должны загрузиться до замеров ширины текста
   await Promise.all((FONTS.preload || ['700 40px Oswald']).map(f => document.fonts.load(f, 'АБВабвGgЯя0123')));
   await document.fonts.ready;
+  mannerDefs(svgEl);
   TOTAL = buildBeats(defs);
   if (!CLEAN) buildUi();
   let t = QUERY.has('t') ? parseFloat(QUERY.get('t')) : 0;

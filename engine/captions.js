@@ -24,8 +24,9 @@ function caps(p, id, pre = 0) {
     const e = G(CUR.fixed || p, { x: CX, y: CAP.y, s: .88, o: 0 }), size = Math.min(CAP.size, CAP.size * CAP.max_width / inkW(c.text, CAP.size));
     const t = T(e, c.text, { x: 0, y: 0, size, fill: CAP.color, weight: 600, anchor: 'middle' });
     t.setAttribute('stroke', CAP.stroke); t.setAttribute('stroke-width', size / 6); t.setAttribute('paint-order', 'stroke'); t.setAttribute('stroke-linejoin', 'round');
-    tw(e, { s: 1, o: 1 }, t0, .07, out);
-    hide(e, t1, .05, lin);
+    // при рывках кадр держится всю ступень: смена без затухания, иначе две надписи видны поверх друг друга
+    tw(e, { s: 1, o: 1 }, t0, MN.step > 0 ? .001 : .07, out);
+    hide(e, t1, MN.step > 0 ? .001 : .05, lin);
   });
   CUR.end = конец;
   CUR.quiet = false;

@@ -144,7 +144,7 @@ def test_переход_показывает_обе_сцены_а_потом_о�
 def test_камера_двигает_сцену_но_не_субтитры(мини):
     _эпизод_из_двух(мини, trans='cut', анимации='анимации:\n  камера: [наезд]\n  входы: []\n')
     with _Браузер(_страница(мини, 'тест-камера')) as b:
-        сост = lambda t: (b.page.evaluate('t => MM.seek(t)', t), b.page.evaluate("[...document.querySelectorAll('#mm-svg > g')].filter(g => g.getAttribute('display') === 'inline').map(g => [g.children[0].getAttribute('transform'), g.children[1].getAttribute('transform')])[0]"))[1]
+        сост = lambda t: (b.page.evaluate('t => MM.seek(t)', t), b.page.evaluate("[BEAT_LIST[0].world.getAttribute('transform'), BEAT_LIST[0].fixed.getAttribute('transform')]"))[1]
         начало, конец = сост(.05), сост(1.3)
         assert начало[0] != конец[0] and конец[0] and 'scale' in конец[0], f'камера должна менять слой сцены: {начало} → {конец}'
         assert начало[1] is None and конец[1] is None, 'слой субтитров стоит на месте'
