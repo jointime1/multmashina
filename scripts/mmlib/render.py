@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import serve
+from . import gitignore, serve
 
 SR = 44100
 ГРОМКОСТЬ_ЭФФЕКТОВ = .25     # эффекты тише голоса; множитель на «громкость» из sfx(...)
@@ -126,6 +126,7 @@ def снять(сборка, mp4, fps=30, высота=1920, потоков=4, l
             print(f'Снято кадров: {готово}')
             _звук(сборка, man, td / 'audio.wav')
             mp4.parent.mkdir(parents=True, exist_ok=True)
+            gitignore.скрыть_от_git(mp4.parent, '*.mp4', '*.srt')       # готовое видео не должно попасть в коммит проекта
             tmp = mp4.with_suffix('.tmp.mp4')
             подкл = ['-c:v', 'h264_videotoolbox', '-b:v', '12M'] if кодек == 'videotoolbox' else ['-c:v', 'libx264', '-crf', '18', '-preset', 'medium']
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-framerate', str(fps), '-i', str(td / '%06d.jpg'), '-i', str(td / 'audio.wav'),

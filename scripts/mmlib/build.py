@@ -8,7 +8,7 @@ import re
 import shutil
 from pathlib import Path
 
-from . import config
+from . import config, gitignore
 
 ДВИЖОК = ['core.js', 'icons.js', 'kit.js', 'captions.js', 'scenery.js', 'characters.js', 'player.js']   # порядок подключения
 МЕТКА = re.compile(r'\[\[(\w+)\]\]')
@@ -58,6 +58,7 @@ def собрать(папка, выход=None, стиль_имя=None):
             raise config.ОшибкаКонфига(f'Не буду стирать {вых}: очищаются только папки внутри build/')
         shutil.rmtree(вых)
     (вых / 'engine').mkdir(parents=True)
+    gitignore.скрыть_от_git(вых, '*')                   # папка пересоздаётся при каждой сборке, коммитить в ней нечего
     for f in ДВИЖОК:
         src = config.ROOT / 'engine' / f
         if not src.exists():
@@ -68,7 +69,7 @@ def собрать(папка, выход=None, стиль_имя=None):
     скрипты = ep.get('скрипты', ['scenes.js'])
     for f in скрипты:
         shutil.copy(папка / f, вых / 'episode' / Path(f).name)
-    shutil.copytree(аудио, вых / 'audio', ignore=shutil.ignore_patterns('timings.json', '*.wav'))
+    shutil.copytree(аудио, вых / 'audio', ignore=shutil.ignore_patterns('timings.json', '*.wav', '.gitignore'))
     shutil.copy(config.ROOT / 'assets' / 'grain.png', вых / 'grain.png')
     (вых / 'sfx').mkdir()
     for f in (config.ROOT / 'assets' / 'sfx').glob('*.mp3'):

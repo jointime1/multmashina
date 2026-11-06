@@ -7,7 +7,7 @@
 import subprocess
 from pathlib import Path
 
-from . import build, serve
+from . import build, gitignore, serve
 
 
 def _моменты(man, строка):
@@ -34,6 +34,7 @@ def снять(папка, куда=None, моменты=None, стиль_имя
     сборка = build.собрать(папка, стиль_имя=стиль_имя)
     куда = Path(куда) if куда else Path.cwd() / 'review' / папка.resolve().name
     куда.mkdir(parents=True, exist_ok=True)
+    gitignore.скрыть_от_git(куда, '*.png', '*.txt')
     for старый in куда.glob('*'):
         if старый.suffix in ('.png', '.txt'):
             старый.unlink()

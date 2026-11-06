@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .. import config
+from .. import config, gitignore
 from .align import Выравнивание, разобрать_метки, время_меток
 from .backends import БЭКЕНДЫ, ОшибкаОзвучки
 
@@ -114,6 +114,7 @@ def озвучить(папка, бэкенд=None, только=None):
     выбор = set(только.split(',')) if только else None
     аудио, сырые = папка / 'audio', папка / 'audio' / 'raw'
     сырые.mkdir(parents=True, exist_ok=True)
+    gitignore.скрыть_от_git(сырые, '*')                              # сырые дорожки воспроизводятся командой «озвучить»; в коммит идут готовые mp3 и timings.json
     tf = аудио / 'timings.json'
     тайминги = json.loads(tf.read_text(encoding='utf-8')) if tf.exists() else {}
     тайминги = {k: v for k, v in тайминги.items() if k in биты}      # убранные из сценария биты уходят и отсюда

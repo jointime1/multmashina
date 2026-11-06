@@ -35,6 +35,7 @@ uv run python -m playwright install chromium
 uv run python scripts/mm.py смотреть examples/jobturbo
 
 # снять видео: out/jobturbo.mp4 и субтитры out/jobturbo.srt
+# (в своём проекте внутри git-репозитория рядом с ними ляжет .gitignore: готовое видео в коммит не попадёт)
 uv run python scripts/mm.py снять examples/jobturbo
 
 # тот же эпизод в другом стиле
@@ -162,7 +163,7 @@ scenes.js + engine/ ────────────────────
 ## Разработка
 
 ```bash
-uv run --extra dev python -m pytest          # 57 тестов, включая детерминизм кадров в Chromium и согласованность скилла с командами
+uv run --extra dev python -m pytest          # 67 тестов, включая детерминизм кадров в Chromium и согласованность скилла с командами
 ```
 
 ## Лицензия
