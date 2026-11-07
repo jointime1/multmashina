@@ -385,46 +385,61 @@ RIGS.jelly = {
 };
 
 // ============================== силуэт ==============================
-// Театр теней: фигура залита одной тушью (INK), «дырами» остаются только глаза, рот, брови и очки: сквозь них виден фон сцены (цвет «тёмный» палитры).
-// Играет позой: качается на палочке, руки вскидываются, глаза косеют от злости. Годится для стилей, где «тёмный» светлее туши.
+// Театр теней в цвете: фигура залита одним глубоким цветом героя, по краю идёт яркий контровой свет того же оттенка, «прорези» глаз, рта, бровей и очков светятся им же.
+// Оттенок берётся у героя: цвет глаз, если он задан, иначе цвет одежды (если насыщенный), иначе цвет кожи. Играет позой: качается на палочке, руки вскидываются, глаза косеют.
+const hexHsl = hex => {
+  const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  let h = 0, s = 0;
+  if (d) { s = d / (1 - Math.abs(2 * l - 1)); h = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60; }
+  return [h, s, l];
+};
+const hslHex = (h, s, l) => {
+  const a = s * Math.min(l, 1 - l), f = n => { const k = (n + h / 30) % 12; return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))).toString(16).padStart(2, '0'); };
+  return '#' + f(0) + f(8) + f(4);
+};
+function shadowTints(body, skin, eye) {
+  const hue = hex => { if (!hex) return null; const [h, s] = hexHsl(hex); return s >= .25 ? h : null; };
+  const h = [hue(eye), hue(body), hue(skin)].find(x => x !== null) ?? 28;
+  return { deep: hslHex(h, .6, .16), rim: hslHex(h, .92, .6), glow: hslHex(h, .95, .8) };
+}
 RIGS.shadow = {
   face(g, x, y, s, keys, t0, t1, o = {}) {
     const A = actor(g, x, y, s, keys, t0, t1, o, 'shadow'), R = A.R, L = rigLook(o), neckUp = (MN.neck - 1) * 110;
-    const cut = DARK;                                                   // цвет дыр: фон за фигурой
-    const hole = (parent, tag, attrs) => { const e = mk(tag, attrs, parent); return e; };
+    const { deep, rim, glow } = shadowTints(L.body, L.skin, o.eyeCol);
+    const sil = { fill: deep, stroke: rim, 'stroke-width': 6, 'stroke-linejoin': 'round' };       // фигура и контровой свет
     const B = mk('g', { 'data-body': 1 }, R);
-    mk('rect', { x: -30, y: 90, width: 60, height: 112, rx: 14, fill: INK }, B);
-    if (L.cloak) mk('path', { d: 'M -150 340 L -222 200 C -120 124 120 124 222 200 L 150 340 Z', fill: INK }, B);
-    mk('path', { d: 'M -196 340 C -196 232 -124 176 -46 166 L 46 166 C 124 176 196 232 196 340 Z', fill: INK }, B);
-    if (L.armor) [-1, 1].forEach(sd => mk('path', { d: `M ${sd * 110} 186 L ${sd * 196} 84 L ${sd * 176} 232 Z`, fill: INK }, B));
-    if (L.build !== 1) B.setAttribute('data-build', L.build);
+    mk('rect', { x: -30, y: 90, width: 60, height: 112, rx: 14, ...sil }, B);
+    if (L.cloak) mk('path', { d: 'M -150 340 L -222 200 C -120 124 120 124 222 200 L 150 340 Z', ...sil }, B);
+    mk('path', { d: 'M -196 340 C -196 232 -124 176 -46 166 L 46 166 C 124 176 196 232 196 340 Z', ...sil }, B);
+    if (L.armor) [-1, 1].forEach(sd => mk('path', { d: `M ${sd * 110} 186 L ${sd * 196} 84 L ${sd * 176} 232 Z`, ...sil }, B));
 
     const H = mk('g', { 'data-head': 1 }, R);
-    if (L.long) [-1, 1].forEach(sd => mk('path', { d: `M ${sd * 120} -50 C ${sd * 170} 70 ${sd * 160} 190 ${sd * 108} 232 L ${sd * 84} 190 L ${sd * 98} 20 Z`, fill: INK }, H));
-    [-1, 1].forEach(sd => mk('circle', { cx: sd * 124, cy: 8, r: 26, fill: INK }, H));
-    mk('circle', { r: 122, fill: INK }, H);
+    if (L.long) [-1, 1].forEach(sd => mk('path', { d: `M ${sd * 120} -50 C ${sd * 170} 70 ${sd * 160} 190 ${sd * 108} 232 L ${sd * 84} 190 L ${sd * 98} 20 Z`, ...sil }, H));
+    [-1, 1].forEach(sd => mk('circle', { cx: sd * 124, cy: 8, r: 26, ...sil }, H));
+    mk('circle', { r: 122, ...sil }, H);
     const hair = mk('g', { opacity: L.bald ? 0 : 1 }, H);
-    mk('path', { d: 'M -128 -22 C -142 -150 -62 -198 4 -192 C 84 -198 144 -132 128 -22 Z', fill: INK }, hair);
-    if (!L.long) mk('path', { d: 'M -60 -176 L -88 -236 L -22 -190 Z M 10 -190 L 4 -254 L 54 -186 Z M 74 -170 L 116 -226 L 114 -148 Z', fill: INK }, hair);
+    mk('path', { d: 'M -128 -22 C -142 -150 -62 -198 4 -192 C 84 -198 144 -132 128 -22 Z', ...sil }, hair);
+    if (!L.long) mk('path', { d: 'M -60 -176 L -88 -236 L -22 -190 Z M 10 -190 L 4 -254 L 54 -186 Z M 74 -170 L 116 -226 L 114 -148 Z', ...sil }, hair);
     const cap = mk('g', { opacity: 0 }, H);
-    mk('path', { d: 'M -134 -34 C -138 -156 -50 -184 14 -180 C 98 -176 142 -120 138 -34 Z M -10 -52 C 50 -72 130 -62 170 -36 C 134 -20 50 -30 -10 -46 Z', fill: INK }, cap);
+    mk('path', { d: 'M -134 -34 C -138 -156 -50 -184 14 -180 C 98 -176 142 -120 138 -34 Z M -10 -52 C 50 -72 130 -62 170 -36 C 134 -20 50 -30 -10 -46 Z', ...sil }, cap);
 
-    const eyes = [-1, 1].map(sd => {                                    // глаз: светлая дыра, тёмный зрачок внутри, наклон — от злости
+    const eyes = [-1, 1].map(sd => {                                    // глаз: светящаяся прорезь, тёмный зрачок внутри, наклон — от злости
       const e = mk('g', { 'data-eye': 1, 'data-light': 1 }, H);
-      const white = hole(e, 'ellipse', { rx: 27, ry: 31, fill: cut }), pup = mk('g', {}, e);
-      mk('circle', { r: 10, fill: o.eyeCol || INK }, pup);
+      const white = mk('ellipse', { rx: 27, ry: 31, fill: glow }, e), pup = mk('g', {}, e);
+      mk('circle', { r: 10, fill: deep }, pup);
       return { sd, e, white, pup };
     });
-    const brows = [-1, 1].map(() => hole(H, 'path', { stroke: cut, 'stroke-width': 13, 'stroke-linecap': 'round', fill: 'none', 'data-light': 1 }));
+    const brows = [-1, 1].map(() => mk('path', { stroke: glow, 'stroke-width': 13, 'stroke-linecap': 'round', fill: 'none', 'data-light': 1 }, H));
     const glass = mk('g', { opacity: L.glasses, 'data-light': 1 }, H);
-    [-1, 1].forEach(sd => mk('circle', { cx: sd * 52, cy: -8, r: 44, fill: 'none', stroke: cut, 'stroke-width': 7 }, glass));
-    mk('path', { d: 'M -8 -14 Q 0 -22 8 -14', stroke: cut, 'stroke-width': 7, fill: 'none' }, glass);
-    const mouth = hole(H, 'path', { stroke: cut, 'stroke-width': 10, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', fill: cut, 'fill-opacity': 0, transform: 'translate(0 78)', 'data-light': 1 });
-    const tears = [-1, 1].map(sd => [0, 1].map(i => hole(H, 'ellipse', { rx: 8, ry: 12, fill: cut, opacity: 0, cx: sd * 58 + (i ? 7 : -7), 'data-light': 1 })));
-    const sweat = hole(H, 'path', { d: dropPath, fill: cut, opacity: 0, 'data-light': 1 });
+    [-1, 1].forEach(sd => mk('circle', { cx: sd * 52, cy: -8, r: 44, fill: 'none', stroke: glow, 'stroke-width': 7 }, glass));
+    mk('path', { d: 'M -8 -14 Q 0 -22 8 -14', stroke: glow, 'stroke-width': 7, fill: 'none' }, glass);
+    const mouth = mk('path', { stroke: glow, 'stroke-width': 10, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', fill: glow, 'fill-opacity': 0, transform: 'translate(0 78)', 'data-light': 1 }, H);
+    const tears = [-1, 1].map(sd => [0, 1].map(i => mk('ellipse', { rx: 8, ry: 12, fill: glow, opacity: 0, cx: sd * 58 + (i ? 7 : -7), 'data-light': 1 }, H)));
+    const sweat = mk('path', { d: dropPath, fill: glow, opacity: 0, 'data-light': 1 }, H);
 
     const AR = mk('g', {}, R);
-    const arms = [-1, 1].map(sd => { const a = mk('g', { 'data-arm': 1 }, AR); mk('path', { d: 'M 0 0 L 0 150', stroke: INK, 'stroke-width': 34, 'stroke-linecap': 'round', fill: 'none' }, a); mk('circle', { cy: 166, r: 26, fill: INK }, a); return a; });
+    const arms = [-1, 1].map(sd => { const a = mk('g', { 'data-arm': 1 }, AR); mk('path', { d: 'M 0 0 L 0 150', stroke: rim, 'stroke-width': 42, 'stroke-linecap': 'round', fill: 'none' }, a); mk('path', { d: 'M 0 0 L 0 150', stroke: deep, 'stroke-width': 30, 'stroke-linecap': 'round', fill: 'none' }, a); mk('circle', { cy: 166, r: 27, ...sil }, a); return a; });
 
     A.run(({ p, tt, blink, pk }) => {
       const sway = Math.sin(tt * 3.4) * 2.4;                            // кукла на палочке: плавно качается всё время
@@ -450,23 +465,29 @@ RIGS.shadow = {
     return R;
   },
 
-  // человечек-силуэт: сплошная фигура, светятся только глаза и очки
+  // человечек-силуэт: сплошная фигура цвета героя с контровым светом, светятся глаза и очки
   figure(g, name, x, y, s = .5, o = {}) {
     const c = tones(name), moving = o.to !== undefined, dir = moving ? Math.sign(o.to - x) || 1 : 0, t0 = o.t0 || 0, t1 = o.t1 === undefined ? t0 + 2 : o.t1;
-    const rate = o.run ? 10 : 6, amp = o.run ? 42 : 26, ph0 = o.phase || 0, cut = DARK;
+    const rate = o.run ? 10 : 6, amp = o.run ? 42 : 26, ph0 = o.phase || 0;
+    const { deep, rim, glow } = shadowTints(c.body, c.skin, c.o.eyeCol), sil = { fill: deep, stroke: rim, 'stroke-width': 8, 'stroke-linejoin': 'round' };
     const e = G(g, { x, y, s });
     e.setAttribute('data-hero', '1'); e.setAttribute('data-rig', 'shadow');
     const body = mk('g', { 'data-body': 1 }, e);
-    const limb = (px, py, len, w, leg) => { const l = mk('g', leg ? { 'data-leg': 1 } : {}, body); mk('path', { d: `M ${px} ${py} L ${px} ${py + len}`, stroke: INK, 'stroke-width': w, 'stroke-linecap': 'round', fill: 'none' }, l); return l; };
+    const limb = (px, py, len, w, leg) => {
+      const l = mk('g', leg ? { 'data-leg': 1 } : {}, body);
+      mk('path', { d: `M ${px} ${py} L ${px} ${py + len}`, stroke: rim, 'stroke-width': w + 12, 'stroke-linecap': 'round', fill: 'none' }, l);
+      mk('path', { d: `M ${px} ${py} L ${px} ${py + len}`, stroke: deep, 'stroke-width': w, 'stroke-linecap': 'round', fill: 'none' }, l);
+      return l;
+    };
     const legB = limb(-30, -250, 250, 56, true), legF = limb(30, -250, 250, 56, true), armB = limb(-70, -420, 180, 42), armF = limb(70, -420, 180, 42);
-    mk('path', { d: 'M -78 -440 Q 0 -462 78 -440 L 66 -240 L -66 -240 Z', fill: INK }, body);
+    mk('path', { d: 'M -78 -440 Q 0 -462 78 -440 L 66 -240 L -66 -240 Z', ...sil }, body);
     const head = mk('g', { 'data-head': 1, transform: `translate(0 -520) scale(${MN.headW} ${MN.headH}) translate(0 520)` }, body);
-    if (c.long) mk('path', { d: 'M -100 -560 C -124 -470 -112 -400 -84 -386 L 84 -386 C 112 -400 124 -470 100 -560 Z', fill: INK }, head);
-    mk('circle', { cy: -520, r: 94, fill: INK }, head);
-    if (!c.bald && !c.cap) mk('path', { d: 'M -96 -540 C -106 -650 106 -650 96 -540 L 62 -592 L 38 -540 L 8 -622 L -14 -540 L -48 -608 Z', fill: INK }, head);
-    if (c.cap) mk('path', { d: 'M -100 -548 C -104 -640 100 -640 100 -548 L 150 -540 L 96 -520 Z', fill: INK }, head);
-    [-1, 1].forEach(sd => mk('circle', { cx: dir * 16 + sd * 34, cy: -526, r: 12, fill: o.eye || cut, 'data-light': 1 }, head));
-    if (c.glasses) [-1, 1].forEach(sd => mk('circle', { cx: dir * 16 + sd * 34, cy: -526, r: 31, fill: 'none', stroke: cut, 'stroke-width': 6, 'data-light': 1 }, head));
+    if (c.long) mk('path', { d: 'M -100 -560 C -124 -470 -112 -400 -84 -386 L 84 -386 C 112 -400 124 -470 100 -560 Z', ...sil }, head);
+    mk('circle', { cy: -520, r: 94, ...sil }, head);
+    if (!c.bald && !c.cap) mk('path', { d: 'M -96 -540 C -106 -650 106 -650 96 -540 L 62 -592 L 38 -540 L 8 -622 L -14 -540 L -48 -608 Z', ...sil }, head);
+    if (c.cap) mk('path', { d: 'M -100 -548 C -104 -640 100 -640 100 -548 L 150 -540 L 96 -520 Z', ...sil }, head);
+    [-1, 1].forEach(sd => mk('circle', { cx: dir * 16 + sd * 34, cy: -526, r: 12, fill: o.eye || glow, 'data-light': 1 }, head));
+    if (c.glasses) [-1, 1].forEach(sd => mk('circle', { cx: dir * 16 + sd * 34, cy: -526, r: 31, fill: 'none', stroke: glow, 'stroke-width': 6, 'data-light': 1 }, head));
     if (moving) tw(e, { x: o.to }, t0, t1 - t0, lin);
     tick(t => {
       const on = moving && t >= t0 && t <= t1, ph = (t - t0) * rate + ph0, a = on ? Math.sin(ph) * amp : 0;

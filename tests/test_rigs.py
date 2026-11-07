@@ -1,5 +1,6 @@
 """Школы анимации: из чего собран персонаж и как он двигается. Фильтр и цвет рисунка (манера) тут не при чём: проверяем устройство кадра и движение."""
 import base64
+import colorsys
 import re
 
 import pytest
@@ -255,18 +256,58 @@ def test_зрачок_лежит_поверх_белка_глаза(мини, в
         assert центр
 
 
+# ---------- полный цвет ----------
+
+СТИЛИ_ВСЕ = sorted(f.stem for f in (config.ROOT / 'styles').glob('*.yaml'))
+ПАЛИТРА_ПО_УМОЛЧАНИЮ = {'dark': '#0b1220', 'light': '#f1f5f9', 'red': '#ff3b3b', 'accent': '#38bdf8', 'muted': '#94a3b8', 'mark': '#ffd23f', 'green': '#22c55e', 'ink': '#12141c', 'sea': '#0c4a6e', 'steel': '#94a3b8'}
+
+
+def _hsl(цвет):
+    r, g, b = (int(цвет[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    return h * 360, s, l
+
+
+@pytest.mark.parametrize('имя', СТИЛИ_ВСЕ)
+def test_готовый_стиль_полноцветный(имя):
+    """Тона сводят кадр к двум-четырём краскам: это одноцветная картинка. Готовые стили её не используют (ключ `тона` остаётся для своих)."""
+    с = config.стиль(имя)
+    assert not с.get('manner', {}).get('tones'), f'{имя}: кадр сведён к тонам, а нужен полный цвет'
+    палитра = {**ПАЛИТРА_ПО_УМОЛЧАНИЮ, **с.get('palette', {})}
+    яркие = [_hsl(c) for c in палитра.values() if _hsl(c)[1] >= .35 and .15 <= _hsl(c)[2] <= .85]
+    assert len(яркие) >= 4 and len({int(h // 60) for h, _, _ in яркие}) >= 3, f'{имя}: в палитре мало разных насыщенных цветов: {палитра}'
+
+
 # ---------- силуэт ----------
 
 @pytest.mark.browser
-def test_силуэт_залит_одним_цветом_а_светлые_только_черты(мини, в_пустой):  # noqa: F811
+def test_силуэт_залит_глубоким_цветом_героя_с_яркой_каймой(мини, в_пустой):  # noqa: F811
+    """Сплошная фигура не чёрная: глубокий насыщенный цвет героя, по краю цветной контровой свет, черты светятся тем же цветом."""
     with _Браузер(_школа(мини, персонаж='силуэт')) as б:
         б.page.evaluate('MM.seek(.7)')
         р = б.page.evaluate("""() => {
           const тёмные = [...document.querySelectorAll('[data-hero] *')].filter(e => !e.closest('[data-light]') && e.getAttribute('fill') && e.getAttribute('fill') !== 'none');
-          return { заливки: [...new Set(тёмные.map(e => e.getAttribute('fill')))], тушь: INK, черты: document.querySelectorAll('[data-light]').length };
+          const края = [...document.querySelectorAll('[data-hero] *')].filter(e => !e.closest('[data-light]') && e.getAttribute('stroke') && e.getAttribute('stroke') !== 'none');
+          return { заливки: [...new Set(тёмные.map(e => e.getAttribute('fill')))], края: [...new Set(края.map(e => e.getAttribute('stroke')))], черты: document.querySelectorAll('[data-light]').length };
         }""")
-    assert р['заливки'] == [р['тушь']], 'в силуэте нет ничего, кроме одной краски и светлых черт'
-    assert р['черты'] >= 4
+    assert len(р['заливки']) == 1 and р['черты'] >= 4, р
+    h, s_, l = _hsl(р['заливки'][0])
+    assert s_ >= .35 and l <= .3, f'фигура должна быть глубокого цвета, а не чёрной: {р["заливки"]}'
+    каймы = [c for c in р['края'] if c != р['заливки'][0]]
+    assert len(каймы) == 1, f'нужна одна цветная кайма: {р["края"]}'
+    assert _hsl(каймы[0])[1] >= .6 and _hsl(каймы[0])[2] >= .5, f'кайма должна быть яркой: {каймы}'
+    assert abs(_hsl(каймы[0])[0] - h) < 3, 'кайма того же оттенка, что фигура'
+
+
+@pytest.mark.browser
+def test_силуэты_разных_героев_разного_цвета(мини, в_пустой):  # noqa: F811
+    сцена = ("room(s, 'комната'); hero(s, 'петя', 250, 900, 1, [[0, 'neutral']], 0, D, { hoodCol: '#14532d' });"
+             "hero(s, 'петя', 650, 900, 1, [[0, 'neutral']], 0, D, { hoodCol: '#7c1d1d' });")
+    with _Браузер(_школа(мини, сцена, персонаж='силуэт')) as б:
+        б.page.evaluate('MM.seek(.7)')
+        цвета = б.page.evaluate("() => [...document.querySelectorAll('[data-hero]')].map(h => h.querySelector('circle').getAttribute('fill'))")
+    h1, h2 = _hsl(цвета[0])[0], _hsl(цвета[1])[0]
+    assert min(abs(h1 - h2), 360 - abs(h1 - h2)) > 60, f'зелёный и красный герои должны отличаться цветом силуэта: {цвета}'
 
 
 @pytest.mark.browser
