@@ -13,7 +13,21 @@ const LINE = { stroke: INK, 'stroke-width': 6, 'stroke-linejoin': 'round' };
 // hair — волосы дыбом, r — наклон головы, shk — дрожь, wink — подмигивание, shades — тёмные очки, rank — 0 Петя, 1 Петрович,
 // helm — сварочная маска на голове, mask — забрало маски (0 поднято, 1 опущено на глаза).
 const EMO0 = { by: 0, bt: 0, ba: 0, eo: 1, px: 0, py: 0, mw: 50, mc: 0, mu: 0, ml: 0, teeth: 0, gap: 0, tear: 0, sweat: 0, blush: 0,
-  bags: .2, hair: 0, r: 0, shk: 0, wink: 0, shades: 0, rank: 0, helm: 0, mask: 0 };
+  bags: .2, hair: 0, r: 0, shk: 0, wink: 0, shades: 0, rank: 0, helm: 0, mask: 0,
+  al: 0, ar: 0, wl: 0, wr: 0, wv: 0 };                          // жест: угол левой и правой руки, их вес (0 — рука сама по эмоции, 1 — жест), размах маха
+// Жесты рук (третий элемент ключа: { gest: 'point' }). Угол — на сколько градусов рука отведена от тела наружу (минус — к телу и лицу), вес 1 — жест, пока ключ не снимет его.
+// Руки у персонажей, где они есть (каракуля, марионетка, вырезка, желе, силуэт, шланг, классика, пиксель и обычный с `руки`).
+const GEST = {
+  point:     { ar: 100, wr: 1 },                                  // показать правой рукой в сторону
+  pointleft: { al: 100, wl: 1 },
+  wave:      { ar: 140, wr: 1, wv: 22 },                          // помахать правой, рука поднята и ходит
+  waveleft:  { al: 140, wl: 1, wv: 22 },
+  shrug:     { al: 48, ar: 48, wl: 1, wr: 1 },                    // пожать плечами: обе руки в стороны
+  facepalm:  { ar: -125, wr: 1 },                                 // ладонь к лицу
+  handsup:   { al: 150, ar: 150, wl: 1, wr: 1 },                  // руки вверх
+  hips:      { al: 36, ar: 36, wl: 1, wr: 1 },                    // руки на поясе (чуть в стороны)
+  cross:     { al: -75, ar: -75, wl: 1, wr: 1 },                  // скрестить руки на груди
+};
 const EMO = {
   neutral:  {},
   dead:     { eo: .5, py: .5, bags: 1, mw: 40, mc: 6, mu: 4, ml: 4 },
@@ -71,7 +85,11 @@ let faceN = 0;
    Состояние: p — лицо сейчас (параметры EMO), tt — время со сдвигом, blink — моргание 0..1, pk — сила вздрагивания, since — сколько секунд прошло с последней смены эмоции, until — сколько осталось до следующей (по нему герой готовится к реакции), talk — открытость рта на речи (0..1). */
 function actor(g, x, y, s, keys, t0, t1, o, rig) {
   const id = ++faceN, seed = o.seed || 0;
-  keys = keys.map(([t, name, over]) => ({ t, p: { ...EMO0, ...(EMO[name] || {}), ...(over || {}) } }));
+  keys = keys.map(([t, name, over]) => {
+    const { gest, ...rest } = over || {};
+    if (gest && !GEST[gest]) throw new Error(`Нет жеста «${gest}»; есть: ${Object.keys(GEST).join(', ')}`);
+    return { t, p: { ...EMO0, ...(EMO[name] || {}), ...(gest ? GEST[gest] : {}), ...rest } };
+  });
   const own = o.enter && o.enter !== 'pop';                         // свой вход (drop, left, right, rise, zoom, spin) вместо прыжка по умолчанию
   const R = G(g, o.in === undefined || own ? { x, y, s } : { x, y, s: s * .7, o: 0 });
   R.setAttribute('data-hero', '1');                                 // по этой метке проверка находит героев в кадре и считает план

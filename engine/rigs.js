@@ -29,8 +29,10 @@ function rigLook(o) {
 function armPose(p, tt) {
   const shock = clamp01((p.eo - 1) / .35), rage = clamp01(p.teeth * clamp01(p.bt / 24)), hands = clamp01(p.tear), think = clamp01(-p.py * 1.4), tired = clamp01((p.bags - .2) / .8);
   return [-1, 1].map(sd => {
-    let away = 8 + 142 * shock + 38 * rage - 5 * tired + Math.sin(tt * 1.7 + sd * 1.3) * 3 + Math.sin(tt * 38 + sd) * 6 * rage, near = 140 * hands + (sd > 0 ? 125 * think : 0);
-    return -sd * (away - near);
+    let away = 8 + 142 * shock + 38 * rage - 5 * tired + Math.sin(tt * 1.7 + sd * 1.3) * 3 + Math.sin(tt * 38 + sd) * 6 * rage, near = 140 * hands + (sd > 0 ? 125 * think : 0), net = away - near;
+    const w = sd < 0 ? p.wl : p.wr;                                     // жест (gest) перекрывает руку, вес w плавно переводит от эмоции к жесту
+    if (w > 0) net += ((sd < 0 ? p.al : p.ar) + Math.sin(tt * 14 + sd) * p.wv * w - net) * w;
+    return -sd * net;
   });
 }
 
