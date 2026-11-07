@@ -779,20 +779,25 @@ const mouthClass = p => {
 RIGS.paper = {
   face(g, x, y, s, keys, t0, t1, o = {}) {
     const A = actor(g, x, y, s, keys, t0, t1, o, 'paper'), R = A.R, L = rigLook(o), neckUp = (MN.neck - 1) * 110;
-    const edge = { stroke: INK, 'stroke-width': 5, 'stroke-linejoin': 'round' }, dark = '#4a1414';
-    const card = (parent, tag, attrs) => { mk(tag, { ...attrs, fill: 'rgba(0,0,0,.28)', transform: 'translate(7 10)' }, parent); return mk(tag, { ...attrs, ...edge }, parent); };
+    const edge = { stroke: INK, 'stroke-width': 4, 'stroke-linejoin': 'round' }, dark = '#4a1414';
+    const card = (parent, tag, attrs) => {                              // бумажная деталь: две полупрозрачные тени разной глубины и сама деталь с тонким контуром
+      mk(tag, { ...attrs, fill: 'rgba(0,0,0,.14)', transform: 'translate(11 15)' }, parent); mk(tag, { ...attrs, fill: 'rgba(0,0,0,.18)', transform: 'translate(6 8)' }, parent);
+      return mk(tag, { ...attrs, ...edge }, parent);
+    };
     const mitt = L.bald ? '#c0392b' : L.hair;
     const B = mk('g', { 'data-body': 1 }, R);
     if (L.cloak) card(B, 'path', { d: 'M -200 340 L -250 204 Q 0 120 250 204 L 200 340 Z', fill: L.cloak });
     card(B, 'path', { d: 'M -180 340 C -206 240 -126 172 0 168 C 126 172 206 240 180 340 Z', fill: L.body });          // парка
     mk('path', { d: 'M 0 178 L 0 340', stroke: INK, 'stroke-width': 4, fill: 'none' }, B);                              // молния
-    card(B, 'ellipse', { cx: 0, cy: 166, rx: 98, ry: 34, fill: shadeHex(L.body, .8) });                                 // воротник
+    for (let i = -5; i <= 5; i++) card(B, 'circle', { cx: i * 19, cy: 160 + Math.abs(i) * 4, r: 24, fill: shadeHex(L.body, 1.18) });                          // меховой воротник капюшона
+    card(B, 'ellipse', { cx: 0, cy: 170, rx: 70, ry: 26, fill: shadeHex(L.body, .8) });
     if (L.tie) card(B, 'path', { d: 'M -16 196 L 16 196 L 24 300 L 0 336 L -24 300 Z', fill: L.tie });
     if (L.armor) [-1, 1].forEach(sd => card(B, 'path', { d: `M ${sd * 118} 188 L ${sd * 196} 98 L ${sd * 178} 228 Z`, fill: '#94a3b8' }));
 
     const H = mk('g', { 'data-head': 1 }, R);
     if (L.long) [-1, 1].forEach(sd => card(H, 'path', { d: `M ${sd * 124} -40 C ${sd * 170} 60 ${sd * 156} 190 ${sd * 112} 230 L ${sd * 88} 190 L ${sd * 100} 20 Z`, fill: L.hair }));
     card(H, 'ellipse', { cx: 0, cy: 0, rx: 134, ry: 118, fill: L.skin });
+    mk('path', { d: 'M -104 -62 Q -70 -100 -14 -108', stroke: '#fff', 'stroke-width': 9, 'stroke-linecap': 'round', fill: 'none', opacity: .26 }, H);                       // блик на гладкой бумаге
     const blush = [-1, 1].map(sd => mk('ellipse', { cx: sd * 94, cy: 52, rx: 26, ry: 16, fill: '#ef4444', opacity: 0 }, H));
     const eyes = [-1, 1].map(sd => {                                    // овал-белок, точка-зрачок у переносицы, веко — картонка
       const E = mk('g', { 'data-eye': 1, transform: `translate(${sd * 38} -14)` }, H), cid = `mpa${A.id}${sd > 0 ? 'r' : 'l'}`;
@@ -807,7 +812,7 @@ RIGS.paper = {
     const glass = mk('g', { opacity: L.glasses }, H);
     [-1, 1].forEach(sd => mk('circle', { cx: sd * 46, cy: -14, r: 46, fill: 'none', ...edge, 'stroke-width': 4 }, glass));      // кольца касаются в центре, а не налезают друг на друга
     const mouthG = mk('g', { transform: 'translate(0 72)' }, H), mouths = [0, 1, 2, 3, 4, 5].map(() => mk('g', { 'data-mouth': 1, opacity: 0 }, mouthG));
-    const line = { ...edge, 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' };
+    const line = { ...edge, 'stroke-width': 4.5, fill: 'none', 'stroke-linecap': 'round' };
     mk('path', { d: 'M -34 0 Q 0 10 34 0', ...line }, mouths[0]);
     mk('path', { d: 'M -52 -8 Q 0 36 52 -8', ...line }, mouths[1]);
     mk('path', { d: 'M -46 16 Q 0 -24 46 16', ...line }, mouths[2]);
@@ -828,19 +833,19 @@ RIGS.paper = {
     const arms = [-1, 1].map(sd => { const a = mk('g', { 'data-arm': 1 }, AR); card(a, 'rect', { x: -22, y: -4, width: 44, height: 112, rx: 22, fill: L.body }); card(a, 'circle', { cy: 124, r: 32, fill: mitt }); return a; });
 
     A.run(({ p, tt, blink, pk }) => {
-      const rock = [-2, 0, 2, 0][Math.floor(tt * 3) % 4], lift = kq(-pk * 60, 30) + neckUp, bt = `translate(0 ${lift}) scale(${MN.body * L.build} 1)`;
+      const rock = Math.sin(tt * 3.4) * 1.6, lift = -pk * 60 + neckUp, bt = `translate(0 ${lift}) scale(${MN.body * L.build} 1)`;
       B.setAttribute('transform', bt); AR.setAttribute('transform', bt);
-      H.setAttribute('transform', `translate(${p.shk ? Math.sign(Math.sin(tt * 46)) * p.shk * 1.5 : 0} ${kq(-pk * 100, 50) + neckUp}) rotate(${kq(p.r + (o.tilt || 0), 4) + rock})${bigHead()}`);
+      H.setAttribute('transform', `translate(${p.shk ? Math.sign(Math.sin(tt * 46)) * p.shk * 1.5 : 0} ${num(-pk * 100 + neckUp)}) rotate(${num(p.r + (o.tilt || 0) + rock)})${bigHead()}`);
       const pose = armPose(p, tt);
-      arms.forEach((a, i) => a.setAttribute('transform', `translate(${(i ? 1 : -1) * 158 * L.build * MN.body} 214) rotate(${kq(pose[i], 12)})`));
+      arms.forEach((a, i) => a.setAttribute('transform', `translate(${(i ? 1 : -1) * 158 * L.build * MN.body} 214) rotate(${num(pose[i])})`));
       hair.setAttribute('opacity', (L.bald ? 0 : 1) * (p.rank > .5 ? 0 : 1)); cap.setAttribute('opacity', p.rank > .5 ? 1 : 0);
       must.setAttribute('opacity', p.rank > .5 || L.must ? 1 : 0); glass.setAttribute('opacity', p.rank > .5 || p.shades > .5 ? 0 : L.glasses);
       blush.forEach(b => b.setAttribute('opacity', p.blush > .4 ? .55 : 0));
       sweat.setAttribute('opacity', p.sweat > .5 ? 1 : 0); sweat.setAttribute('transform', `translate(104 ${-90 + Math.floor((tt * .8) % 1 * 3) * 22})`);
       eyes.forEach((E, i) => {
         const open = p.eo * (blink > .5 ? 0 : 1) * (E.sd > 0 ? 1 - p.wink : 1), edgeY = open >= .9 ? -52 : open >= .65 ? -24 : open >= .35 ? 2 : 48;
-        E.lid.setAttribute('transform', `translate(0 ${edgeY}) rotate(${kq(-E.sd * Math.max(-30, Math.min(30, p.bt)) * .7, 6)})`);    // злой глаз: веко косит к переносице
-        E.pupil.setAttribute('transform', `translate(${kq(-E.sd * 14 + p.px * 12, 6)} ${kq(4 + p.py * 12, 6)})`);
+        E.lid.setAttribute('transform', `translate(0 ${edgeY}) rotate(${num(-E.sd * Math.max(-30, Math.min(30, p.bt)) * .7)})`);    // злой глаз: веко косит к переносице
+        E.pupil.setAttribute('transform', `translate(${num(-E.sd * 14 + p.px * 12)} ${num(4 + p.py * 12)})`);
         tears[i].setAttribute('opacity', p.tear > .5 ? 1 : 0); tears[i].setAttribute('transform', `translate(0 ${Math.floor((tt * 1.5 + (E.sd > 0 ? .25 : 0)) % 1 * 4) / 4 * 140})`);
       });
       const w = mouthClass(p);
@@ -872,7 +877,7 @@ RIGS.paper = {
     if (moving) tw(e, { x: o.to }, t0, t1 - t0, lin);
     tick(t => {
       const on = moving && t >= t0 && t <= t1, step = Math.floor(((t - t0) * rate + ph0 / 3) * 2), side = step % 2 ? 1 : -1;
-      const rock = on ? side * (o.run ? 9 : 6) : [-2, 0, 2, 0][Math.floor(t * 3 + ph0) % 4];
+      const rock = on ? Math.sin((t - t0) * rate * Math.PI * 2 + ph0) * (o.run ? 9 : 6) : Math.sin(t * 3.4 + ph0) * 1.6;
       armF.setAttribute('transform', `rotate(${on ? -side * 14 : 0} 96 -320)`); armB.setAttribute('transform', `rotate(${on ? side * 14 : 0} -96 -320)`);
       body.setAttribute('transform', `translate(0 ${on && side > 0 ? -8 : 0}) rotate(${rock} 0 0)`);
     });

@@ -591,6 +591,30 @@ def test_у_классики_вырез_кожей_только_у_пиджак�
     assert вырезы[0] == 0 and вырезы[1] >= 1, вырезы
 
 
+@pytest.mark.browser
+def test_голова_вырезки_поворачивается_плавно_а_не_ступенями(мини, в_пустой):  # noqa: F811
+    """Бумажные детали жёсткие, но двигаются плавно: поворот головы не залипает на ступенях по 4 градуса."""
+    сцена = "room(s, 'комната'); hero(s, 'петя', CX, 900, 1.2, [[0, 'neutral'], [.6, 'neutral', { r: 14 }]], 0, D);"
+    with _Браузер(_школа(мини, сцена, персонаж='вырезка')) as б:
+        углы = []
+        for i in range(14):
+            б.page.evaluate('t => MM.seek(t)', .38 + i * .015)
+            углы.append(round(б.page.evaluate(f"() => ({УГОЛ})(document.querySelector('[data-head]'))"), 2))
+    assert len(set(углы)) >= 9, f'поворот головы идёт ступенями: {углы}'
+
+
+@pytest.mark.browser
+def test_контур_и_тень_вырезки_тоньше_и_мягче(мини, в_пустой):  # noqa: F811
+    """Контур тоньше, а тень под деталью двойная и полупрозрачная: меньше «топорности»."""
+    with _Браузер(_школа(мини, персонаж='вырезка')) as б:
+        б.page.evaluate('MM.seek(.7)')
+        р = б.page.evaluate("""() => { const э = [...document.querySelectorAll('[data-head] *')];
+          return { контур: Math.max(...э.filter(e => e.getAttribute('stroke') === INK).map(e => +e.getAttribute('stroke-width'))),
+                   тени: э.filter(e => (e.getAttribute('fill') || '').startsWith('rgba(0,0,0')).length }; }""")
+    assert р['контур'] <= 4.5, р
+    assert р['тени'] >= 4, р
+
+
 # ---------- человечки на общем плане ----------
 
 ЧЕЛОВЕЧЕК = "[...document.querySelectorAll('[data-hero] %s')]"
