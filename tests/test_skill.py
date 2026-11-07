@@ -97,3 +97,14 @@ def test_файлы_для_агентов_на_месте():
     assert '.claude/skills/multmashina/SKILL.md' in (КОРЕНЬ / 'AGENTS.md').read_text(encoding='utf-8')
     команда = (КОРЕНЬ / '.opencode' / 'commands' / 'multmashina.md').read_text(encoding='utf-8')
     assert '$ARGUMENTS' in команда and (КОРЕНЬ / '.claude/skills/multmashina/SKILL.md').exists()
+
+
+def test_скилл_велит_делать_ролик_по_материалу_из_источника():
+    """Сценарий по чужому материалу растёт из него, а не из привычек автора: правило есть везде, где агент принимает решения."""
+    скилл = (СКИЛЛ / 'SKILL.md').read_text(encoding='utf-8')
+    письмо = (СКИЛЛ / 'references' / 'writing.md').read_text(encoding='utf-8')
+    работа = (СКИЛЛ / 'references' / 'workflow.md').read_text(encoding='utf-8')
+    for имя, текст in (('SKILL.md', скилл), ('writing.md', письмо), ('workflow.md', работа)):
+        assert 'источник.md' in текст, f'{имя}: не сказано про источник.md'
+    assert 'клише' in письмо and 'Откуда' in письмо, 'writing.md: нет правила про выдуманные клише темы и столбца «Откуда» в раскадровке'
+    assert 'клише' in скилл, 'SKILL.md: нет запрета на шутки «из головы»'

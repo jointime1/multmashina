@@ -178,3 +178,19 @@ def test_кадры_неизвестный_бит(мини, в_пустой, tmp
         if 'Executable' in str(e):
             pytest.skip(f'нет Chromium: {e}')
         raise
+
+
+@pytest.mark.browser
+def test_проверить_сверяет_ролик_с_источником(мини, в_пустой, capsys):
+    from mmlib import check
+    (мини / 'источник.md').write_text('Кто-то написал про погоду на выходных: дождь, ветер, зонт, плед, чай и долгие разговоры за столом '
+                                     'о том, как хорошо дома, когда за окном такое; остальные согласились и добавили про варенье.', encoding='utf-8')
+    try:
+        код = check.проверить(мини)
+    except Exception as e:
+        if 'Executable' in str(e):
+            pytest.skip(f'нет Chromium: {e}')
+        raise
+    вывод = capsys.readouterr().out
+    assert 'источник' in вывод and 'Привет' in вывод, вывод           # «Привет» в ролике есть, в источнике нет
+    assert код == 0                                                  # замечание, а не ошибка
