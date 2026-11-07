@@ -104,7 +104,10 @@ function inset(g, name, keys, t0, t1, o = {}) {
 // человечек целиком: ноги, руки, походка. x, y — точка между ступнями, рост 600 px × s (s меньше 0,8 — это общий план).
 // o: to — куда идёт, t0, t1 — когда, run — бегом, phase — сдвиг шага, чтобы толпа шла вразнобой
 function figure(g, name, x, y, s = .5, o = {}) {
-  if (MN.rig !== 'bust') return RIGS[MN.rig].figure(g, name, x, y, s, o);   // другой способ построить героя: engine/rigs.js
+  const rig = RIGS[MN.rig];
+  return rig && rig.figure ? rig.figure(g, name, x, y, s, o) : figureBust(g, name, x, y, s, o);   // другой способ построить героя: engine/rigs.js; без своего человечка — обычный
+}
+function figureBust(g, name, x, y, s = .5, o = {}) {
   const c = tones(name), moving = o.to !== undefined, dir = moving ? Math.sign(o.to - x) || 1 : 0;
   const t0 = o.t0 || 0, t1 = o.t1 === undefined ? t0 + 2 : o.t1, rate = o.run ? 10 : 6, amp = o.run ? 42 : 26, b = (c.o.build || 1) * MN.body;
   const e = G(g, { x, y, s });

@@ -44,10 +44,31 @@ function emoAt(keys, tau) {
   return out;
 }
 
+// Речь героя. voice — голос героя (hero() берёт его из имени), talk: false — молчит, true — говорит на всех словах бита, [[от, до], …] — свои окна в секундах бита.
+// Без talk герой говорит на словах реплик своего голоса (сборка кладёт их в TIMINGS[бит].lines). Окно слова — от его начала до следующего слова, но не длиннее, чем слово звучит.
+function speechWindows(voice, talk) {
+  if (talk === false) return [];
+  if (Array.isArray(talk)) return talk.map(([a, b]) => ({ a, b, amp: 1 }));
+  const tm = (window.TIMINGS || {})[BEAT_ID] || {}, words = (window.WORDS || {})[BEAT_ID] || [], pre = (CUR && CUR.pre) || 0;
+  const lines = talk === true ? [['', 0, tm.dur === undefined ? 1e9 : tm.dur]] : (tm.lines || []).filter(l => l[0] && l[0] === voice);
+  const win = [];
+  lines.forEach(([, la, lb]) => words.forEach(([wt, w], i) => {
+    if (wt < la - 1e-6 || wt >= lb - 1e-6) return;
+    const next = i + 1 < words.length ? words[i + 1][0] : lb, len = String(w).replace(/[^\p{L}\p{N}]/gu, '').length, dur = Math.min(next - wt - .03, .09 * len + .12);
+    if (dur > .05) win.push({ a: wt + pre, b: wt + pre + dur, amp: Math.max(.5, Math.min(1, .38 + .09 * len)) });
+  }));
+  return win;
+}
+// насколько открыт рот в момент tau (0..1): на каждом слове рот открывается и закрывается по слогу (~0,13 с)
+const talkAt = (win, tau) => {
+  for (const w of win) if (tau >= w.a && tau < w.b) return w.amp * Math.abs(Math.sin(Math.PI * (tau - w.a) / (w.b - w.a) * Math.max(1, Math.round((w.b - w.a) / .13))));
+  return 0;
+};
+
 let faceN = 0;
 /* actor(g, x, y, s, keys, t0, t1, o, rig): всё, что у героя общее при любом рисунке: группа с входом, ключи эмоций, моргание и реакция на смену эмоции.
    Рисуют героев по-разному (face — обычный, RIGS из rigs.js — остальные), а ведут себя одинаково: run(apply) зовёт apply(состояние) на каждом кадре.
-   Состояние: p — лицо сейчас (параметры EMO), tt — время со сдвигом, blink — моргание 0..1, pk — сила вздрагивания, since — сколько секунд прошло с последней смены эмоции. */
+   Состояние: p — лицо сейчас (параметры EMO), tt — время со сдвигом, blink — моргание 0..1, pk — сила вздрагивания, since — сколько секунд прошло с последней смены эмоции, until — сколько осталось до следующей (по нему герой готовится к реакции), talk — открытость рта на речи (0..1). */
 function actor(g, x, y, s, keys, t0, t1, o, rig) {
   const id = ++faceN, seed = o.seed || 0;
   keys = keys.map(([t, name, over]) => ({ t, p: { ...EMO0, ...(EMO[name] || {}), ...(over || {}) } }));
@@ -59,15 +80,18 @@ function actor(g, x, y, s, keys, t0, t1, o, rig) {
   // реакция: когда эмоция меняется, герой вздрагивает (голова подпрыгивает, тело на миг вытягивается) — оживляет разговорные сцены
   const punch = o.punch !== undefined ? o.punch : MO.punch, moved = keys.map((k, i) => i > 0 && JSON.stringify(k.p) !== JSON.stringify(keys[i - 1].p));
   keys.forEach((k, i) => moved[i] && markChange(k.t));              // смена эмоции — тоже смена картинки
+  const speech = speechWindows(o.voice, o.talk);
   const state = tau => {
-    let bump = 0, since = Infinity;
+    let bump = 0, since = Infinity, until = Infinity;
     for (let k = 1; k < keys.length; k++) if (moved[k]) {
       const a = (tau - keys[k].t + .1) / .34;
       if (punch && a >= 0 && a < 1) bump = Math.max(bump, Math.sin(a * Math.PI));
-      if (tau >= keys[k].t) since = Math.min(since, tau - keys[k].t);
+      if (tau >= keys[k].t) since = Math.min(since, tau - keys[k].t); else until = Math.min(until, keys[k].t - tau);
     }
-    const tt = tau + seed, ph = tt % 3.3;
-    return { p: emoAt(keys, tau), tt, tau, since, pk: punch * bump, blink: ph < .13 ? Math.sin(ph / .13 * Math.PI) : 0 };
+    const tt = tau + seed, ph = tt % 3.3, talk = talkAt(speech, tau);
+    let p = emoAt(keys, tau);
+    if (talk > 0) p = { ...p, mu: p.mu - 16 * talk, ml: p.ml + 50 * talk };                  // речь открывает рот поверх эмоции (до 66: у готовых ртов это «открыт», а не «крик»)
+    return { p, tt, tau, since, until, talk, pk: punch * bump, blink: ph < .13 ? Math.sin(ph / .13 * Math.PI) : 0 };
   };
   const run = apply => {
     CUR.quiet = true;                                               // герой обновляется каждый кадр, сменой картинки считаются только его события
@@ -234,7 +258,26 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
   mk('rect', { x: -98, y: -38, width: 196, height: 62, rx: 12, fill: '#0f2a1d', stroke: INK, 'stroke-width': 4 }, visor);
   mk('path', { d: 'M -80 -26 L -20 -26 L -50 14 Z', fill: 'rgba(255,255,255,.14)' }, visor);
 
+  // руки (манера → руки): рукав цвета одежды и ладонь; поза — из эмоции, как у остальных персонажей (armPose)
+  let AR = null, arms = [];
+  if (MN.arms) {
+    const L = rigLook(o);
+    AR = mk('g', {}, R);
+    arms = [-1, 1].map(sd => {
+      const a = mk('g', { 'data-arm': 1 }, AR);
+      mk('path', { d: 'M 0 0 L 0 140', stroke: INK, 'stroke-width': 58, 'stroke-linecap': 'round', fill: 'none' }, a);
+      mk('path', { d: 'M 0 0 L 0 140', stroke: L.body, 'stroke-width': 46, 'stroke-linecap': 'round', fill: 'none' }, a);
+      mk('circle', { cy: 160, r: 26, fill: skin, ...LINE }, a);
+      return a;
+    });
+  }
+
   A.run(({ p, tt, blink, pk }) => {
+    if (AR) {
+      const bt = `translate(0 ${Math.sin(tt * 2.2) * 3 - pk * 120 + neckUp}) scale(${(1 + pk * .6) * MN.body} ${1 + Math.sin(tt * 2.2) * .012 + pk * 1.2})`, pose = armPose(p, tt);
+      AR.setAttribute('transform', bt);
+      arms.forEach((a, i) => a.setAttribute('transform', `translate(${(i ? 1 : -1) * 176 * build * MN.body} 236) rotate(${num(pose[i])})`));
+    }
     B.setAttribute('transform', `translate(0 ${Math.sin(tt * 2.2) * 3 - pk * 120 + neckUp}) scale(${(1 + pk * .6) * MN.body} ${1 + Math.sin(tt * 2.2) * .012 + pk * 1.2})`);
     hood.setAttribute('opacity', suit || armor ? 0 : 1 - p.rank); ov.setAttribute('opacity', suit || armor ? 0 : p.rank);
     H.setAttribute('transform', `translate(${p.shk ? Math.sin(tt * 46) * p.shk : 0} ${Math.sin(tt * 2.2 + 1) * 2 - pk * 220}) rotate(${p.r + (o.tilt || 0) + Math.sin(tt * 1.3) * 1.2})${headScale}`);
@@ -287,5 +330,5 @@ function lookOf(name) {
 
 // герой по имени из стиля; остальные настройки поверх пресета
 function hero(g, name, x, y, s, keys, t0, t1, o = {}) {
-  return face(g, x, y, s, keys, t0, t1, Object.assign({}, lookOf(name), o));
+  return face(g, x, y, s, keys, t0, t1, Object.assign({ voice: name }, lookOf(name), o));          // голос героя — его имя: он говорит на репликах «имя: текст»
 }

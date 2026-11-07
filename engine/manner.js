@@ -12,9 +12,32 @@ const NOISE_SPREAD = 6;                                      // шум откл�
 let turbulence = null;
 
 // определения манеры: один раз на всю страницу, до сборки битов
+// фактура краски: битмап из шума на нескольких масштабах, один на всю страницу. Светлый, ложится умножением: гуашь даёт пятна и зерно, бумага — мелкое волокно.
+// Шум повторяемый (seeded), поэтому кадр можно снять в любом порядке; слой стоит на месте, камера его не двигает.
+function textureImage(kind) {
+  const w = 450, h = 800, c = document.createElement('canvas'), R = seeded(kind === 'paper' ? 71 : 17);
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d'), img = ctx.createImageData(w, h);
+  const layers = kind === 'paper' ? [[3, .55], [1, .45]] : [[150, .34], [48, .28], [14, .2], [2, .18]], amp = kind === 'paper' ? 52 : 64;     // [размер ячейки в точках, вес]
+  const lat = layers.map(([cell]) => { const gw = Math.ceil(w / cell) + 2, gh = Math.ceil(h / cell) + 2; return { cell, gw, v: Float32Array.from({ length: gw * gh }, R) }; });
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let n = 0;
+    for (let i = 0; i < layers.length; i++) {
+      const L = lat[i], fx = x / L.cell, fy = y / L.cell, ix = fx | 0, iy = fy | 0, tx = smooth(fx - ix), ty = smooth(fy - iy);
+      const a = L.v[iy * L.gw + ix], b = L.v[iy * L.gw + ix + 1], d = L.v[(iy + 1) * L.gw + ix], e = L.v[(iy + 1) * L.gw + ix + 1];
+      n += layers[i][1] * (a + (b - a) * tx + (d - a) * ty + (a - b - d + e) * tx * ty);
+    }
+    const g = 255 - amp * n, k = (y * w + x) * 4;
+    img.data[k] = img.data[k + 1] = img.data[k + 2] = g; img.data[k + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c.toDataURL('image/png');
+}
+
 function mannerDefs(svg) {
-  if (!DRAWN && !MN.dots && !MN.paper) return;
+  if (!DRAWN && !MN.dots && !MN.paper && !MN.texture) return;
   const defs = mk('defs', {}, svg);
+  if (MN.texture) mk('image', { id: 'mm-texture', x: -20, y: -20, width: W + 40, height: H + 40, preserveAspectRatio: 'none', href: textureImage(MN.texture) }, defs);
   if (DRAWN) {
     // область шире кадра: иначе смещение затягивает пустоту с края
     // пиксели: область фильтра кратна клетке, иначе границы клеток уедут от сетки и кадр «поплывёт» при смене размера
@@ -52,6 +75,7 @@ function mannerDefs(svg) {
 
 // слой рисунка бита: фильтр на нём, растр поверх содержимого (вызывать после того, как создан слой сцены)
 function dress(art) {
+  if (MN.texture) { const u = mk('use', { href: '#mm-texture', opacity: MN.textureAmt }); u.style.mixBlendMode = 'multiply'; art.after(u); }   // между слоем рисунка и субтитрами: субтитры остаются чистыми
   if (DRAWN) art.setAttribute('filter', 'url(#mm-manner)');
   if (MN.dots) rect(art, -20, -20, W + 40, H + 40, { fill: 'url(#mm-dots)', opacity: .35 });   // чем слабее слой, тем чище белое и чёрное: точки остаются только в средних тонах
   if (MN.paper) rect(art, -20, -20, W + 40, H + 40, { fill: 'url(#mm-paper)' }).style.mixBlendMode = 'multiply';   // линии бумаги видны сквозь светлое и пропадают на тёмном
