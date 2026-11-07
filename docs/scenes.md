@@ -85,8 +85,8 @@ word(s, 'МИР', ...k.text, m('b'), { size: k.size, fill: MARK, stroke: DARK })
 |---|---|
 | `shot(панель, от, до, {bg, whip, swipe})` | кадр на весь экран; `whip` — въезд сбоку с размытием, `swipe` — снизу |
 | `word(g, текст, x, y, t0, {size, fill, stroke, maxW, enter})` | крупное слово капсом, подгоняется под безопасную зону |
-| `label(g, текст, x, y, t0, {size, fill, colour, enter})` | ярлык на сплошном блоке |
-| `stamp(g, текст, x, y, t0, {size, colour, r, enter})` | резиновый штамп с хлопком |
+| `label(g, текст, x, y, t0, {size, fill, colour, pad, enter})` | ярлык на сплошном блоке; y — строка текста, поля сверху и снизу равны (0,22 кегля), по бокам `pad` (по умолчанию 0,4 кегля) |
+| `stamp(g, текст, x, y, t0, {size, colour, r, enter})` | резиновый штамп с хлопком; (x, y) — центр рамки, буквы в ней по центру с равными полями |
 | `counter(g, n, x, y, t0, {size, fill, dur})` | число набегает от нуля |
 | `marker(g, x, y, w, h, t0)` | жёлтый маркер |
 | `ico(g, 'имя', x, y, размер, цвет, t0, {enter})` | иконка Phosphor (список — в `engine/icons.js`) |

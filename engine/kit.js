@@ -12,6 +12,8 @@ const SANS = FONTS.display_stack, MONO = FONTS.mono;
 // ширина текста в пикселях: нужна, чтобы подгонять слова под безопасную зону
 const MEASURE = document.createElement('canvas').getContext('2d');
 const inkW = (str, size, font = SANS, weight = 600) => { MEASURE.font = `${weight} ${size}px ${font}`; return MEASURE.measureText(str).width; };
+// высота заглавных букв: рамки и блоки строятся вокруг настоящих букв, а не вокруг кегля (у каждого шрифта буквы своей высоты)
+const capH = (size, font = SANS, weight = 600) => { MEASURE.font = `${weight} ${size}px ${font}`; return MEASURE.measureText('Н').actualBoundingBoxAscent; };
 
 // ---------- смена планов ----------
 // shot(панель, от, до, {bg, whip, swipe}): полноэкранный кадр, виден с t0 до t1; whip — въезд сбоку с размытием, swipe — снизу, как лента
@@ -79,21 +81,21 @@ function word(g, str, x, y, t0, { size = 120, fill = DARK, anchor = 'middle', st
   return e;
 }
 
-// ярлык: заглавные буквы на сплошном блоке
-function label(g, str, x, y, t0, { size = 40, fill = DARK, colour = LIGHT, anchor = 'middle', pad = 18, enter: how } = {}) {
+// ярлык: заглавные буквы на сплошном блоке; y — строка текста, поля сверху и снизу равны, по бокам pad (по умолчанию 0,4 кегля)
+function label(g, str, x, y, t0, { size = 40, fill = DARK, colour = LIGHT, anchor = 'middle', pad = size * .4, enter: how } = {}) {
   const w = inkW(str.toUpperCase(), size) + pad * 2, x0 = anchor === 'middle' ? -w / 2 : anchor === 'end' ? -w : 0;
-  const e = G(g, { x, y, s: .85, o: 0 });
-  rect(e, x0, -size * .95, w, size * 1.3, { fill, rx: 4 });
+  const e = G(g, { x, y, s: .85, o: 0 }), ch = capH(size), pv = size * .22;
+  rect(e, x0, -ch - pv, w, ch + pv * 2, { fill, rx: 4 });
   T(e, str.toUpperCase(), { x: x0 + pad, y: 0, size, fill: colour, weight: 600 });
   if (t0 <= .01) put(e, { s: 1, o: 1 }); else enter(e, pickEnter(how), t0, { x, y }, { dur: .18, ease: out });
   return e;
 }
 
-// резиновый штамп: с хлопком (звук bang)
+// резиновый штамп: с хлопком (звук bang); (x, y) — центр рамки, буквы стоят в ней по центру с равными полями
 function stamp(g, str, x, y, t0, { size = 110, colour = RED, r = -9, enter: how = 'pop' } = {}) {
-  const w = inkW(str, size) + 60, e = G(g, { x, y, r, s: 1.7, o: 0 });
-  rect(e, -w / 2, -size * .85, w, size * 1.2, { fill: 'none', stroke: colour, 'stroke-width': size / 11, rx: 10 });
-  T(e, str, { y: size * .3, size, fill: colour, weight: 600, anchor: 'middle' });
+  const ch = capH(size), pv = size * .27, w = inkW(str, size) + size * .9, e = G(g, { x, y, r, s: 1.7, o: 0 });
+  rect(e, -w / 2, -ch / 2 - pv, w, ch + pv * 2, { fill: 'none', stroke: colour, 'stroke-width': size / 11, rx: 10 });
+  T(e, str, { y: ch / 2, size, fill: colour, weight: 600, anchor: 'middle' });
   enter(e, how, t0, { x, y, r }, { dur: .16, ease: out });
   sfx(BEAT_ID, t0, 'bang', 1.4);
   return e;
