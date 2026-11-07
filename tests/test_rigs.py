@@ -1,4 +1,7 @@
 """Школы анимации: из чего собран персонаж и как он двигается. Фильтр и цвет рисунка (манера) тут не при чём: проверяем устройство кадра и движение."""
+import base64
+import re
+
 import pytest
 import yaml
 
@@ -9,7 +12,7 @@ from test_variety import _проверить, _эпизод, в_пустой  # 
 ЭМОЦИИ = "room(s, 'комната'); hero(s, 'петя', CX, 900, 1.2, [[0, 'neutral'], [.5, 'shock'], [1.1, 'rage']], 0, D);"
 ПОКОЙ = "room(s, 'комната'); hero(s, 'петя', CX, 900, 1.2, [[0, 'neutral']], 0, D);"
 ХОДЬБА = "room(s, 'комната'); figure(s, 'петя', 200, 1100, .6, { to: 700, t0: 0, t1: D });"
-ПЕРСОНАЖИ = {'каракуля': 'doodle', 'марионетка': 'puppet', 'желе': 'jelly'}
+ПЕРСОНАЖИ = {'каракуля': 'doodle', 'марионетка': 'puppet', 'желе': 'jelly', 'силуэт': 'shadow', 'шланг': 'hose', 'пиксель': 'pixel'}
 
 
 def _школа(мини, сцена=ЭМОЦИИ, персонаж=None, характер=None):
@@ -152,8 +155,9 @@ def test_у_марионетки_детали_жёсткие_а_у_обычно�
 
 
 @pytest.mark.browser
-def test_рот_марионетки_всегда_одна_готовая_деталь_без_плавных_переходов(мини, в_пустой):  # noqa: F811
-    with _Браузер(_школа(мини, персонаж='марионетка')) as б:
+@pytest.mark.parametrize('имя', ['марионетка', 'пиксель'])
+def test_рот_всегда_одна_готовая_деталь_без_плавных_переходов(мини, в_пустой, имя):  # noqa: F811
+    with _Браузер(_школа(мини, персонаж=имя)) as б:
         видимые = set()
         for i in range(31):
             б.page.evaluate('t => MM.seek(t)', i * .05)
@@ -176,15 +180,20 @@ def test_глаза_марионетки_дробятся_на_ступени(м
 
 
 @pytest.mark.browser
-def test_каракуля_играет_эмоцию_руками_а_у_обычного_героя_рук_нет(мини, в_пустой):  # noqa: F811
+@pytest.mark.parametrize('имя', ['каракуля', 'силуэт', 'шланг'])
+def test_руки_играют_эмоцию_а_у_обычного_героя_рук_нет(мини, в_пустой, имя):  # noqa: F811
     углы = {}
-    with _Браузер(_школа(мини, персонаж='каракуля')) as б:
+    with _Браузер(_школа(мини, персонаж=имя)) as б:
         for t in (.2, .8):
             б.page.evaluate('t => MM.seek(t)', t)
             углы[t] = б.page.evaluate(f"() => [...document.querySelectorAll('[data-arm]')].map({УГОЛ})")
     assert len(углы[.2]) == 2 and len(углы[.8]) == 2
     assert all(abs(углы[.8][i] - углы[.2][i]) > 40 for i in (0, 1)), f'руки не отреагировали на шок: {углы}'
     assert углы[.8][0] * углы[.8][1] < 0, 'руки вскидываются в разные стороны от тела'
+
+
+@pytest.mark.browser
+def test_у_обычного_героя_рук_нет(мини, в_пустой):  # noqa: F811
     with _Браузер(_школа(мини)) as б:
         assert б.page.evaluate("document.querySelectorAll('[data-arm]').length") == 0
 
@@ -244,6 +253,181 @@ def test_зрачок_лежит_поверх_белка_глаза(мини, в
         assert верно, 'зрачок должен идти в дереве после белка'
         центр = б.page.evaluate("() => { const e = document.querySelector('[data-hero] ellipse[fill=\"#fff\"]:not([opacity])'), r = e.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }")
         assert центр
+
+
+# ---------- силуэт ----------
+
+@pytest.mark.browser
+def test_силуэт_залит_одним_цветом_а_светлые_только_черты(мини, в_пустой):  # noqa: F811
+    with _Браузер(_школа(мини, персонаж='силуэт')) as б:
+        б.page.evaluate('MM.seek(.7)')
+        р = б.page.evaluate("""() => {
+          const тёмные = [...document.querySelectorAll('[data-hero] *')].filter(e => !e.closest('[data-light]') && e.getAttribute('fill') && e.getAttribute('fill') !== 'none');
+          return { заливки: [...new Set(тёмные.map(e => e.getAttribute('fill')))], тушь: INK, черты: document.querySelectorAll('[data-light]').length };
+        }""")
+    assert р['заливки'] == [р['тушь']], 'в силуэте нет ничего, кроме одной краски и светлых черт'
+    assert р['черты'] >= 4
+
+
+@pytest.mark.browser
+def test_глаза_силуэта_косеют_от_злости(мини, в_пустой):  # noqa: F811
+    сцена = "room(s, 'комната'); hero(s, 'петя', CX, 900, 1.2, [[0, 'neutral'], [.5, 'rage']], 0, D);"
+    углы = {}
+    with _Браузер(_школа(мини, сцена, персонаж='силуэт')) as б:
+        for t in (.2, 1.0):
+            б.page.evaluate('t => MM.seek(t)', t)
+            углы[t] = б.page.evaluate(f"() => [...document.querySelectorAll('[data-eye]')].map({УГОЛ})")
+    assert len(углы[.2]) == 2 and all(abs(a) < 3 for a in углы[.2])
+    assert all(abs(a) > 10 for a in углы[1.0]) and углы[1.0][0] * углы[1.0][1] < 0, 'злые глаза скошены к переносице'
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize('имя', ['силуэт', 'шланг'])
+def test_персонаж_не_замирает_и_в_покое(мини, в_пустой, имя):  # noqa: F811
+    with _Браузер(_школа(мини, ПОКОЙ, персонаж=имя)) as б:
+        позы = set()
+        for i in range(8):
+            б.page.evaluate('t => MM.seek(t)', .3 + i * .1)
+            позы.add(б.page.evaluate("document.querySelector('[data-body]').getAttribute('transform')"))
+    assert len(позы) >= 6, 'тело стоит как вкопанное'
+
+
+# ---------- шланг ----------
+
+ВЕРШИНЫ = "() => ({ y: +/translate\\(\\S+ (-?[\\d.]+)/.exec(document.querySelector('[data-body]').getAttribute('transform'))[1] })"
+
+
+def _пики(ряд):
+    return sum(1 for a, b, c in zip(ряд, ряд[1:], ряд[2:]) if b < a and b < c)
+
+
+@pytest.mark.browser
+def test_шланг_подпрыгивает_в_такт_и_макароны_рук_пляшут(мини, в_пустой):  # noqa: F811
+    высоты, макароны = [], set()
+    with _Браузер(_школа(мини, ПОКОЙ, персонаж='шланг')) as б:
+        for i in range(25):
+            б.page.evaluate('t => MM.seek(t)', .3 + i * .05)
+            высоты.append(б.page.evaluate(ВЕРШИНЫ)['y'])
+            макароны.add(б.page.evaluate("[...document.querySelectorAll('[data-arm] path[data-noodle]')].map(e => e.getAttribute('d')).join('|')"))
+    assert _пики(высоты) >= 2, f'нет отскоков в такт: {высоты}'
+    assert len(макароны) >= 6, 'руки-макароны не колышутся'
+    обычный = []
+    with _Браузер(_школа(мини, ПОКОЙ)) as б:
+        for i in range(25):
+            б.page.evaluate('t => MM.seek(t)', .3 + i * .05)
+            обычный.append(б.page.evaluate(ВЕРШИНЫ)['y'])
+    assert _пики(обычный) <= 1, 'контрольный обычный герой не должен прыгать'
+
+
+@pytest.mark.browser
+def test_глаза_шланга_с_вырезом_следят_за_взглядом(мини, в_пустой):  # noqa: F811
+    сцена = "room(s, 'комната'); hero(s, 'петя', CX, 900, 1.2, [[0, 'neutral', { px: .9 }], [.5, 'neutral', { px: -.9 }]], 0, D);"
+    with _Браузер(_школа(мини, сцена, персонаж='шланг')) as б:
+        повороты = []
+        for t in (.2, .9):
+            б.page.evaluate('t => MM.seek(t)', t)
+            повороты.append(б.page.evaluate("() => [...document.querySelectorAll('[data-pie]')].map(e => e.getAttribute('transform'))"))
+    assert len(повороты[0]) == 2 and повороты[0] != повороты[1], 'вырез зрачка должен поворачиваться за взглядом'
+
+
+# ---------- пиксель ----------
+
+СЕТКА = 20
+ГЕОМЕТРИЯ = """() => [...document.querySelectorAll('[data-hero] *')].map(e => ({
+  тег: e.tagName, x: +(e.getAttribute('x') || 0), y: +(e.getAttribute('y') || 0), w: +(e.getAttribute('width') || 0), h: +(e.getAttribute('height') || 0),
+  tr: e.getAttribute('transform') || '' }))"""
+
+
+def _на_сетке(элементы):
+    плохие = []
+    for e in элементы:
+        if e['тег'] not in ('g', 'rect'):
+            плохие.append(f"{e['тег']} вместо квадратов")
+        for k in ('x', 'y', 'w', 'h'):
+            if e[k] % СЕТКА:
+                плохие.append(f"{e['тег']} {k}={e[k]}")
+        if 'rotate' in e['tr'] or 'scale' in e['tr']:
+            плохие.append(f"поворот или масштаб: {e['tr']}")
+        for m in re.finditer(r'translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)', e['tr']):
+            if float(m.group(1)) % СЕТКА or float(m.group(2)) % СЕТКА:
+                плохие.append(f"сдвиг мимо сетки: {e['tr']}")
+    return плохие
+
+
+@pytest.mark.browser
+def test_пиксельный_герой_весь_из_квадратов_сетки(мини, в_пустой):  # noqa: F811
+    with _Браузер(_школа(мини, персонаж='пиксель')) as б:
+        for t in (.1, .7, 1.3):
+            б.page.evaluate('t => MM.seek(t)', t)
+            плохие = _на_сетке(б.page.evaluate(ГЕОМЕТРИЯ))
+            assert not плохие, (t, плохие[:6])
+
+
+@pytest.mark.browser
+def test_пиксельные_руки_это_готовые_позы_спрайтами(мини, в_пустой):  # noqa: F811
+    позы = {}
+    with _Браузер(_школа(мини, персонаж='пиксель')) as б:
+        for i in range(31):
+            б.page.evaluate('t => MM.seek(t)', i * .05)
+            видимые = б.page.evaluate("() => [...document.querySelectorAll('[data-arm]')].map(a => [...a.querySelectorAll('[data-pose]')].map(p => p.getAttribute('opacity') === null ? 1 : +p.getAttribute('opacity')))")
+            assert len(видимые) == 2 and all(len(v) >= 3 and sum(v) == 1 and max(v) == 1 for v in видимые), (i * .05, видимые)
+            позы[i] = tuple(v.index(1) for v in видимые)
+    assert позы[4] != позы[16], 'поза рук не меняется от шока'
+
+
+@pytest.mark.browser
+def test_человечек_пикселя_шагает_сменой_спрайтов(мини, в_пустой):  # noqa: F811
+    with _Браузер(_школа(мини, ХОДЬБА, персонаж='пиксель')) as б:
+        кадры = []
+        for t in (.3, .5, .7):
+            б.page.evaluate('t => MM.seek(t)', t)
+            кадры.append(tuple(б.page.evaluate("() => [...document.querySelectorAll('[data-leg]')].map(e => e.getAttribute('opacity') === null ? 1 : +e.getAttribute('opacity'))")))
+            assert not _на_сетке(б.page.evaluate(ГЕОМЕТРИЯ)), кадры
+        assert len(set(кадры)) >= 2 and all(sum(k) == 1 for k in кадры), кадры
+
+
+ЯЧЕЙКИ = """async ([ссылка, ячейка]) => {
+  const картинка = new Image(); картинка.src = ссылка; await картинка.decode();
+  const c = document.createElement('canvas'); c.width = картинка.width; c.height = картинка.height;
+  const x = c.getContext('2d'); x.drawImage(картинка, 0, 0);
+  const д = x.getImageData(0, 0, c.width, c.height).data;
+  let разные = 0, всего = 0;
+  for (let y = 3; y < c.height * .7; y += 5) for (let px = 0; px + 1 < c.width; px++) {     // ниже лежат субтитры: они вне фильтра и остаются чёткими
+    if ((px + 1) % ячейка === 0) continue;                       // граница ячейки: тут перепад законен
+    const i = (y * c.width + px) * 4, j = i + 4;
+    всего++; if (Math.abs(д[i] - д[j]) + Math.abs(д[i + 1] - д[j + 1]) + Math.abs(д[i + 2] - д[j + 2]) > 30) разные++;
+  }
+  return разные / всего;
+}"""
+
+
+def _доля_перепадов_внутри_ячейки(б, ячейка_px):
+    б.page.evaluate('MM.seek(.7)')
+    ссылка = 'data:image/png;base64,' + base64.b64encode(б.page.screenshot(type='png')).decode()
+    return б.page.evaluate(ЯЧЕЙКИ, [ссылка, ячейка_px])
+
+
+def _без_зерна(мини, манера=None):
+    """Эпизод без зерна и виньетки: шум плёнки лежит поверх фильтра и мешает мерить склейку."""
+    _эпизод(мини, {'один': ПОКОЙ})
+    ep = yaml.safe_load((мини / 'episode.yaml').read_text(encoding='utf-8'))
+    ep.pop('анимации', None), ep.pop('манера', None)
+    ep['эффекты'] = {'зерно': False, 'виньетка': 0}
+    if манера:
+        ep['манера'] = манера
+    (мини / 'episode.yaml').write_text(yaml.safe_dump(ep, allow_unicode=True), encoding='utf-8')
+    return build.собрать(мини, выход=config.ROOT / 'build' / 'тест-школа')
+
+
+@pytest.mark.browser
+def test_пиксели_манеры_склеивают_кадр_в_крупные_точки(мини, в_пустой):  # noqa: F811
+    """Ячейка 10 единиц сцены = 5 точек на экране 450 px (целое число: дробная ячейка даёт швы): внутри ячейки цвет не меняется, перепады только на её границах."""
+    with _Браузер(_без_зерна(мини)) as б:
+        обычный = _доля_перепадов_внутри_ячейки(б, 5)
+    with _Браузер(_без_зерна(мини, {'пиксели': 10})) as б:
+        крупно = _доля_перепадов_внутри_ячейки(б, 5)
+    assert обычный > .01, f'контрольный кадр без пикселей должен иметь перепады: {обычный}'
+    assert крупно < обычный / 5 and крупно < .004, f'внутри ячейки цвет меняется: {крупно} против {обычный}'
 
 
 # ---------- человечки на общем плане ----------
@@ -307,12 +491,12 @@ def test_герой_с_вычурным_обликом_остаётся_узна
         assert б.page.evaluate("document.querySelectorAll('[data-hero]').length") == 2
 
 
-@pytest.mark.parametrize('слово', ['персонаж', 'каракуля', 'марионетка', 'желе', 'характер', 'пружина', 'резкий', 'механика'])
+@pytest.mark.parametrize('слово', ['персонаж', 'каракуля', 'марионетка', 'желе', 'силуэт', 'шланг', 'пиксель', 'пиксели', 'характер', 'пружина', 'резкий', 'механика'])
 def test_школа_описана_в_справочнике(слово):
     assert слово in (config.ROOT / 'docs' / 'styles.md').read_text(encoding='utf-8')
 
 
-@pytest.mark.parametrize('файл', ['notebook', 'cutout', 'jelly'])
+@pytest.mark.parametrize('файл', ['notebook', 'cutout', 'jelly', 'shadow', 'hose', 'pixel'])
 def test_стиль_школы_задаёт_персонажа_и_характер(файл):
     с = config.стиль(файл)
     assert с['manner'].get('rig') and с['motion'].get('feel')

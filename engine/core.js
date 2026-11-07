@@ -19,7 +19,7 @@ const FX = Object.assign({ lead: .22, hold: .3, grain: true, vignette: .5 }, STY
 const LEAD = FX.lead;
 // движение: входы элементов, переходы между сценами, камера, реакция героев (стиль → анимации); по умолчанию всё выключено
 // манера рисунка (стиль → манера, engine/manner.js): по умолчанию всё как нарисовано
-const MN = Object.assign({ line: 1, wobble: 0, detail: .012, boil: 8, step: 0, tones: [], stepped: true, dots: 0, paper: '', flat: false, eyes: 'round', headW: 1, headH: 1, body: 1, neck: 1, rig: 'bust' }, STYLE.manner);
+const MN = Object.assign({ line: 1, wobble: 0, detail: .012, boil: 8, step: 0, tones: [], stepped: true, dots: 0, paper: '', flat: false, eyes: 'round', headW: 1, headH: 1, body: 1, neck: 1, rig: 'bust', pixels: 0 }, STYLE.manner);
 const MO = Object.assign({ enters: [], trans: [], cam: [], camAmp: .04, transDur: .22, punch: 0, feel: 'smooth' }, STYLE.motion);                                               // картинка опережает слово на LEAD секунд: на самом слове она уже «приехала»
 
 // ---------- плавности ----------
