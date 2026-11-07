@@ -2,6 +2,7 @@
 """Мультмашина: универсальный генератор мультиков и рилсов. Команды:
 
   python scripts/mm.py окружение                    что есть на машине: ffmpeg, Chromium, голосовые бэкенды (с чего начинать агенту)
+  python scripts/mm.py стили                        какие есть стили, чем отличаются (персонаж, движение); --превью снимает витрину docs/previews
   python scripts/mm.py новый examples/<имя>         новый эпизод из шаблона (3 бита, герой, комната, субтитры)
   python scripts/mm.py проверить examples/<эпизод>  ошибки в сценах, слова вне безопасной зоны, длины и темп речи
   python scripts/mm.py кадры examples/<эпизод>      контактные листы кадров: увидеть свою работу глазами
@@ -26,6 +27,8 @@ def парсер():
     sub = p.add_subparsers(dest='команда', required=True)
     sub.add_parser('ассеты')
     sub.add_parser('окружение')
+    st = sub.add_parser('стили'); st.add_argument('--превью', nargs='?', const='docs/previews', help='снять витрину: полоса кадров на стиль и общий лист (по умолчанию docs/previews)')
+    st.add_argument('--только', help='снять витрину только этих стилей через запятую')
     ob = sub.add_parser('образец'); ob.add_argument('база', help='путь без расширения, например voices/олег'); ob.add_argument('--описание', required=True, help='голос словами, лучше по-английски')
     ob.add_argument('--текст', required=True, help='что произнести (10–15 секунд речи; это же текст_эталона)'); ob.add_argument('--seeds', default='1,2,3', help='варианты, через запятую')
     n = sub.add_parser('новый'); n.add_argument('эпизод', help='куда создать, например examples/мой-ролик')
@@ -57,6 +60,14 @@ def main():
         if a.команда == 'окружение':
             from mmlib import env
             sys.exit(env.проверить())
+        elif a.команда == 'стили':
+            from mmlib import styles
+            if a.превью:
+                for f in styles.превью(a.превью, a.только.split(',') if a.только else None):
+                    print('Снято:', f)
+                print(f'Общий лист: {a.превью}/styles.jpg')
+            else:
+                styles.показать()
         elif a.команда == 'образец':
             from mmlib.voice import sample
             sample.сделать(a.база, a.описание, a.текст, [int(x) for x in a.seeds.split(',')])

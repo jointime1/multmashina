@@ -21,7 +21,7 @@ function rigLook(o) {
   const hair = o.hair || HAIR_COL;
   return { skin: o.skin || SKIN, hair, glasses: o.glasses === undefined ? 1 : o.glasses, bald: !!o.bald, long: !!o.longHair, cap: o.capCol || '#374151',
     must: o.mustache || 0, mustCol: o.mustCol || hair, body: o.suit || (typeof o.armor === 'string' ? o.armor : '') || o.hoodCol || '#475569',
-    armor: !!o.armor, cloak: o.armor ? (o.cloak || '#1e3a8a') : '', tie: o.suit ? o.tie : '', build: o.build || 1, eye: o.eyeCol || '', brow: o.browCol || hair };
+    armor: !!o.armor, suit: !!o.suit, cloak: o.armor ? (o.cloak || '#1e3a8a') : '', tie: o.suit ? o.tie : '', build: o.build || 1, eye: o.eyeCol || '', brow: o.browCol || hair };
 }
 
 // руки по эмоции: на сколько градусов повёрнута каждая от «висит вдоль тела» вокруг плеча. Первая — левая на экране, вторая — правая.
@@ -911,7 +911,8 @@ RIGS.classic = {
     if (L.cloak) mk('path', { d: 'M -150 340 L -222 200 C -120 124 120 124 222 200 L 150 340 Z', fill: L.cloak, ...line(tintHex(L.cloak, .4)) }, B);
     mk('path', { d: torso, fill: torsoG, ...line(bodyLine) }, B);
     mk('path', { d: 'M 70 176 C 130 190 196 240 196 340 L 120 340 C 130 260 110 200 70 176 Z', fill: bodyLo, opacity: .55 }, B);                        // тень на боку
-    mk('path', { d: 'M -64 168 L 0 236 L 64 168 Z', fill: skin, ...line(skinLine, 4) }, B);                                                                // вырез
+    if (L.suit) mk('path', { d: 'M -64 168 L 0 236 L 64 168 Z', fill: skin, ...line(skinLine, 4) }, B);                                                       // пиджак: вырез и рубашка
+    else mk('path', { d: 'M -78 170 Q 0 232 78 170 Q 70 150 0 148 Q -70 150 -78 170 Z', fill: bodyHi, ...line(bodyLine, 4.5) }, B);                         // толстовка: воротник капюшона
     if (L.tie) mk('path', { d: 'M -14 196 L 14 196 L 22 300 L 0 334 L -22 300 Z', fill: L.tie, ...line(tintHex(L.tie, .4), 4) }, B);
     if (L.armor) [-1, 1].forEach(sd => mk('path', { d: `M ${sd * 110} 188 L ${sd * 196} 92 L ${sd * 176} 232 Z`, fill: grad('linearGradient', { x1: 0, y1: 0, x2: 1, y2: 1 }, [[0, '#cbd5e1'], [1, '#64748b']]), ...line('#334155') }, B));
 

@@ -581,6 +581,16 @@ def test_обычному_герою_руки_включаются_ключом_
         assert б.page.evaluate("document.querySelectorAll('[data-arm]').length") == 0
 
 
+@pytest.mark.browser
+def test_у_классики_вырез_кожей_только_у_пиджака_а_у_толстовки_воротник_капюшона(мини, в_пустой):  # noqa: F811
+    """Толстовка не открывает грудь до пупка: кожа в вырезе есть у пиджака, у толстовки — воротник капюшона."""
+    сцена = "room(s, 'комната'); hero(s, 'петя', 250, 900, 1, [[0, 'neutral']], 0, D, { skin: '#f2c29b' }); hero(s, 'петя', 650, 900, 1, [[0, 'neutral']], 0, D, { skin: '#f2c29b', suit: '#1f2937', tie: '#b91c1c' });"
+    with _Браузер(_школа(мини, сцена, персонаж='классика')) as б:
+        б.page.evaluate('MM.seek(.7)')
+        вырезы = б.page.evaluate("() => [...document.querySelectorAll('[data-hero]')].map(h => [...h.querySelectorAll('[data-body] path')].filter(e => e.getAttribute('fill') === '#f2c29b').length)")
+    assert вырезы[0] == 0 and вырезы[1] >= 1, вырезы
+
+
 # ---------- человечки на общем плане ----------
 
 ЧЕЛОВЕЧЕК = "[...document.querySelectorAll('[data-hero] %s')]"
