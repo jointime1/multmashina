@@ -104,13 +104,14 @@ function inset(g, name, keys, t0, t1, o = {}) {
 // человечек целиком: ноги, руки, походка. x, y — точка между ступнями, рост 600 px × s (s меньше 0,8 — это общий план).
 // o: to — куда идёт, t0, t1 — когда, run — бегом, phase — сдвиг шага, чтобы толпа шла вразнобой
 function figure(g, name, x, y, s = .5, o = {}) {
+  if (MN.rig !== 'bust') return RIGS[MN.rig].figure(g, name, x, y, s, o);   // другой способ построить героя: engine/rigs.js
   const c = tones(name), moving = o.to !== undefined, dir = moving ? Math.sign(o.to - x) || 1 : 0;
   const t0 = o.t0 || 0, t1 = o.t1 === undefined ? t0 + 2 : o.t1, rate = o.run ? 10 : 6, amp = o.run ? 42 : 26, b = (c.o.build || 1) * MN.body;
   const e = G(g, { x, y, s });
   e.setAttribute('data-hero', '1');
-  const body = mk('g', {}, e);
+  const body = mk('g', { 'data-body': 1 }, e);
   const limb = (px, py, len, w, col, foot) => {
-    const l = mk('g', {}, body);
+    const l = mk('g', foot ? { 'data-leg': 1 } : {}, body);
     mk('path', { d: `M ${px} ${py} L ${px} ${py + len}`, stroke: INK, 'stroke-width': w + 12 * MN.line, 'stroke-linecap': 'round', fill: 'none' }, l);
     mk('path', { d: `M ${px} ${py} L ${px} ${py + len}`, stroke: col, 'stroke-width': w, 'stroke-linecap': 'round', fill: 'none' }, l);
     if (foot) mk('ellipse', { cx: px + (dir || 1) * 16, cy: py + len + 12, rx: 44, ry: 20, fill: '#111827', stroke: INK, 'stroke-width': 6 }, l);

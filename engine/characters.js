@@ -45,6 +45,38 @@ function emoAt(keys, tau) {
 }
 
 let faceN = 0;
+/* actor(g, x, y, s, keys, t0, t1, o, rig): всё, что у героя общее при любом рисунке: группа с входом, ключи эмоций, моргание и реакция на смену эмоции.
+   Рисуют героев по-разному (face — обычный, RIGS из rigs.js — остальные), а ведут себя одинаково: run(apply) зовёт apply(состояние) на каждом кадре.
+   Состояние: p — лицо сейчас (параметры EMO), tt — время со сдвигом, blink — моргание 0..1, pk — сила вздрагивания, since — сколько секунд прошло с последней смены эмоции. */
+function actor(g, x, y, s, keys, t0, t1, o, rig) {
+  const id = ++faceN, seed = o.seed || 0;
+  keys = keys.map(([t, name, over]) => ({ t, p: { ...EMO0, ...(EMO[name] || {}), ...(over || {}) } }));
+  const own = o.enter && o.enter !== 'pop';                         // свой вход (drop, left, right, rise, zoom, spin) вместо прыжка по умолчанию
+  const R = G(g, o.in === undefined || own ? { x, y, s } : { x, y, s: s * .7, o: 0 });
+  R.setAttribute('data-hero', '1');                                 // по этой метке проверка находит героев в кадре и считает план
+  R.setAttribute('data-rig', rig);
+  if (o.in !== undefined) { if (own) enter(R, o.enter, o.in, { x, y, s }); else tw(R, { s, o: 1 }, o.in, .3, back); sfx(BEAT_ID, o.in, 'thud', .5); }
+  // реакция: когда эмоция меняется, герой вздрагивает (голова подпрыгивает, тело на миг вытягивается) — оживляет разговорные сцены
+  const punch = o.punch !== undefined ? o.punch : MO.punch, moved = keys.map((k, i) => i > 0 && JSON.stringify(k.p) !== JSON.stringify(keys[i - 1].p));
+  keys.forEach((k, i) => moved[i] && markChange(k.t));              // смена эмоции — тоже смена картинки
+  const state = tau => {
+    let bump = 0, since = Infinity;
+    for (let k = 1; k < keys.length; k++) if (moved[k]) {
+      const a = (tau - keys[k].t + .1) / .34;
+      if (punch && a >= 0 && a < 1) bump = Math.max(bump, Math.sin(a * Math.PI));
+      if (tau >= keys[k].t) since = Math.min(since, tau - keys[k].t);
+    }
+    const tt = tau + seed, ph = tt % 3.3;
+    return { p: emoAt(keys, tau), tt, tau, since, pk: punch * bump, blink: ph < .13 ? Math.sin(ph / .13 * Math.PI) : 0 };
+  };
+  const run = apply => {
+    CUR.quiet = true;                                               // герой обновляется каждый кадр, сменой картинки считаются только его события
+    prog(q => apply(state(t0 + q * (t1 - t0))), t0, t1 - t0, lin);
+    CUR.quiet = false;
+  };
+  return { R, id, run };
+}
+
 /* face(g, x, y, s, keys, t0, t1, opts): герой по пояс; x, y — центр головы, s — масштаб.
    keys — [[t, 'emo', {добавки}], …] во времени бита; t0..t1 — когда кадр живёт (рисуется на этом отрезке);
    opts: skin, hair (цвет), seed (сдвиг моргания), glasses (0 — без очков), in (когда выпрыгивает) + enter (как: drop, left, right, rise, zoom, spin), tilt,
@@ -54,14 +86,11 @@ let faceN = 0;
          build (ширина торса и рук, 1 — обычный, 1.5 — качок), mustache (усы), buzz (бритая голова со щетиной), eyeCol (цвет радужки),
          browCol (цвет бровей), emblem + emblemCol (надпись на толстовке вместо </>) */
 function face(g, x, y, s, keys, t0, t1, o = {}) {
+  if (MN.rig !== 'bust') return RIGS[MN.rig].face(g, x, y, s, keys, t0, t1, o);   // другой способ построить героя: engine/rigs.js
   const build = o.build || 1, nk = 1 + (build - 1) * .8;
   const shade = (hex, k) => '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
-  const id = ++faceN, skin = o.skin || SKIN, hairC = o.hair || HAIR_COL, seed = o.seed || 0, glasses = o.glasses === undefined ? 1 : o.glasses;
-  keys = keys.map(([t, name, over]) => ({ t, p: { ...EMO0, ...(EMO[name] || {}), ...(over || {}) } }));
-  const own = o.enter && o.enter !== 'pop';                         // свой вход (drop, left, right, rise, zoom, spin) вместо прыжка по умолчанию
-  const R = G(g, o.in === undefined || own ? { x, y, s } : { x, y, s: s * .7, o: 0 });
-  R.setAttribute('data-hero', '1');                                 // по этой метке проверка находит героев в кадре и считает план
-  if (o.in !== undefined) { if (own) enter(R, o.enter, o.in, { x, y, s }); else tw(R, { s, o: 1 }, o.in, .3, back); sfx(BEAT_ID, o.in, 'thud', .5); }
+  const A = actor(g, x, y, s, keys, t0, t1, o, 'bust'), R = A.R, id = A.id;
+  const skin = o.skin || SKIN, hairC = o.hair || HAIR_COL, glasses = o.glasses === undefined ? 1 : o.glasses;
 
   // тело: Петя в толстовке, Петрович в комбинезоне поверх майки (переключаются по rank); массовка — в пиджаке (suit)
   const B = mk('g', { 'data-body': 1 }, R), neckUp = (MN.neck - 1) * 110, torso = 'M -196 340 C -196 232 -124 176 -46 166 L 46 166 C 124 176 196 232 196 340 Z';
@@ -205,14 +234,7 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
   mk('rect', { x: -98, y: -38, width: 196, height: 62, rx: 12, fill: '#0f2a1d', stroke: INK, 'stroke-width': 4 }, visor);
   mk('path', { d: 'M -80 -26 L -20 -26 L -50 14 Z', fill: 'rgba(255,255,255,.14)' }, visor);
 
-  // реакция: когда эмоция меняется, герой вздрагивает (голова подпрыгивает, тело на миг вытягивается) — оживляет разговорные сцены
-  const punch = o.punch !== undefined ? o.punch : MO.punch, moved = keys.map((k, i) => i > 0 && JSON.stringify(k.p) !== JSON.stringify(keys[i - 1].p));
-  keys.forEach((k, i) => moved[i] && markChange(k.t));              // смена эмоции — тоже смена картинки
-  const render = tau => {
-    let bump = 0;
-    if (punch) for (let k = 1; k < keys.length; k++) if (moved[k]) { const a = (tau - keys[k].t + .1) / .34; if (a >= 0 && a < 1) bump = Math.max(bump, Math.sin(a * Math.PI)); }
-    const pk = punch * bump;
-    const p = emoAt(keys, tau), tt = tau + seed, ph = tt % 3.3, blink = ph < .13 ? Math.sin(ph / .13 * Math.PI) : 0;
+  A.run(({ p, tt, blink, pk }) => {
     B.setAttribute('transform', `translate(0 ${Math.sin(tt * 2.2) * 3 - pk * 120 + neckUp}) scale(${(1 + pk * .6) * MN.body} ${1 + Math.sin(tt * 2.2) * .012 + pk * 1.2})`);
     hood.setAttribute('opacity', suit || armor ? 0 : 1 - p.rank); ov.setAttribute('opacity', suit || armor ? 0 : p.rank);
     H.setAttribute('transform', `translate(${p.shk ? Math.sin(tt * 46) * p.shk : 0} ${Math.sin(tt * 2.2 + 1) * 2 - pk * 220}) rotate(${p.r + (o.tilt || 0) + Math.sin(tt * 1.3) * 1.2})${headScale}`);
@@ -242,10 +264,7 @@ function face(g, x, y, s, keys, t0, t1, o = {}) {
     teeth.forEach((t, k) => { t.setAttribute('y', ty); t.setAttribute('opacity', p.teeth * (k === 2 || k === 3 ? 1 - p.gap : 1)); });
     tongue.setAttribute('cy', (p.mc + p.ml) / 2 - 7); tongue.setAttribute('rx', p.mw * .5);
     tongue.setAttribute('opacity', Math.max(0, Math.min(1, (p.ml - p.mu - 40) / 40)));
-  };
-  CUR.quiet = true;                                                 // герой обновляется каждый кадр, сменой картинки считаются только его события
-  prog(q => render(t0 + q * (t1 - t0)), t0, t1 - t0, lin);
-  CUR.quiet = false;
+  });
   return R;
 }
 

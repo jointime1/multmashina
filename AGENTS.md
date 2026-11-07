@@ -33,4 +33,4 @@ $MM +voice +edge озвучить reels/ролик    # экстры озвуч�
 - Служебная команда `ассеты` перегенерирует звуковые эффекты и зерно (`assets/`); обычному ролику она не нужна.
 - Тесты: `uv run --extra dev python -m pytest` (часть тестов запускает Chromium, нужен `python -m playwright install chromium`).
 - Проверка скилла: `tests/test_skill.py` следит, чтобы ссылки в `SKILL.md` вели в существующие файлы, а все команды `mm.py` были описаны.
-- Новые облики героев и эмоции добавляются в `engine/characters.js`; опишите их в `docs/scenes.md`.
+- Новые облики героев и эмоции добавляются в `engine/characters.js`, новые способы построить героя целиком (персонажи) — в `engine/rigs.js`; опишите их в `docs/scenes.md` и `docs/styles.md`.

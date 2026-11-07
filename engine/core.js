@@ -19,15 +19,28 @@ const FX = Object.assign({ lead: .22, hold: .3, grain: true, vignette: .5 }, STY
 const LEAD = FX.lead;
 // движение: входы элементов, переходы между сценами, камера, реакция героев (стиль → анимации); по умолчанию всё выключено
 // манера рисунка (стиль → манера, engine/manner.js): по умолчанию всё как нарисовано
-const MN = Object.assign({ line: 1, wobble: 0, detail: .012, boil: 8, step: 0, tones: [], stepped: true, dots: 0, paper: '', flat: false, eyes: 'round', headW: 1, headH: 1, body: 1, neck: 1 }, STYLE.manner);
-const MO = Object.assign({ enters: [], trans: [], cam: [], camAmp: .04, transDur: .22, punch: 0 }, STYLE.motion);                                               // картинка опережает слово на LEAD секунд: на самом слове она уже «приехала»
+const MN = Object.assign({ line: 1, wobble: 0, detail: .012, boil: 8, step: 0, tones: [], stepped: true, dots: 0, paper: '', flat: false, eyes: 'round', headW: 1, headH: 1, body: 1, neck: 1, rig: 'bust' }, STYLE.manner);
+const MO = Object.assign({ enters: [], trans: [], cam: [], camAmp: .04, transDur: .22, punch: 0, feel: 'smooth' }, STYLE.motion);                                               // картинка опережает слово на LEAD секунд: на самом слове она уже «приехала»
 
 // ---------- плавности ----------
+// Характер движения (стиль → анимации → характер): набор кривых на весь ролик. Сцены зовут out, io, soft, back, а какая это кривая, решает характер,
+// поэтому один и тот же код сцены с пружиной «играет», а с механикой «едет по рельсам». out, io и soft не перелетают цель (по ним считают числа и рисуют линии),
+// перелёт — только у back.
 const lin = q => q;
-const out = q => 1 - Math.pow(1 - q, 3);
-const io = q => q < .5 ? 4 * q * q * q : 1 - Math.pow(-2 * q + 2, 3) / 2;
-const soft = q => (1 - Math.cos(Math.PI * q)) / 2;
-const back = q => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(q - 1, 3) + c1 * Math.pow(q - 1, 2); };
+const cubicOut = q => 1 - Math.pow(1 - q, 3);
+const cubicIO = q => q < .5 ? 4 * q * q * q : 1 - Math.pow(-2 * q + 2, 3) / 2;
+const cosSoft = q => (1 - Math.cos(Math.PI * q)) / 2;
+const overshoot = q => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(q - 1, 3) + c1 * Math.pow(q - 1, 2); };
+const elastic = q => q <= 0 ? 0 : q >= 1 ? 1 : Math.pow(2, -10 * q) * Math.sin((q * 10 - .75) * 2 * Math.PI / 3) + 1;   // раскачивается вокруг цели 3-4 раза и затухает
+const FEELS = {
+  smooth: { out: cubicOut, io: cubicIO, soft: cosSoft, back: overshoot },                                                   // как всегда
+  spring: { out: cubicOut, io: cubicIO, soft: cosSoft, back: elastic },                                                     // всё, что «выпрыгивает», пружинит
+  snap:   { out: q => 1 - Math.pow(1 - q, 7), io: q => q < .5 ? 8 * Math.pow(q, 4) : 1 - 8 * Math.pow(1 - q, 4), soft: q => q * q * q * (q * (6 * q - 15) + 10),
+            back: q => 1 + 1.1 * Math.pow(q - 1, 3) + .4 * Math.pow(q - 1, 2) },                                           // почти мгновенный рывок и короткая посадка
+  mech:   { out: lin, io: lin, soft: lin, back: lin },                                                                      // ровно, без разгона и перелёта: бумажные куклы на палочках, лента
+};
+const FEEL = FEELS[MO.feel] || FEELS.smooth;
+const out = q => FEEL.out(q), io = q => FEEL.io(q), soft = q => FEEL.soft(q), back = q => FEEL.back(q);
 const clamp01 = q => q < 0 ? 0 : q > 1 ? 1 : q;
 const ramp01 = (t, a, b) => clamp01((t - a) / (b - a));
 const smooth = q => q * q * (3 - 2 * q);
